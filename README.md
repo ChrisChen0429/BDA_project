@@ -8,8 +8,7 @@ Columbia University GR 5224 Fall 2018
 
 
 ## Installation
-1. Clone our project repository: `https://github.com/jc4816/BDA-Project`
-2. Install python modules with pip: `pip install -r requirements.txt`
+1. Clone our project repository: `https://github.com/ChrisChen0429/BDA_project`
 
 ## General Steps
 
