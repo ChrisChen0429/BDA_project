@@ -7,22 +7,55 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+## data cleaning
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r}
+data <- read.delim2('core.txt', header = TRUE,sep = '|',quote = "\n")
+## the first 4 lines seems to be wrong, delete it
+data <- data[5:nrow(data),]
+rand_y <- sample(c(0,1,2),size = length(data$y),prob = c(0.7,0.2,0.1),replace = T)
+data$y <- rand_y
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+My design of model:
+
+1. use the logistic regression to model the y which follows the binormal distribution. (probably need to fix the over-dispensity problem)
+
+2. use the QR reparameterization to make a better fit of the MCMC.
+
+3. use the robust noice model with student t distribution
+
+
+## data processing 
+
+Rstan only inpus real or integeer variables. We need to convert the categorial data into dummy variables.
+
+```{r}
+library(rstan)
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+
+model <- stan_model('probity.stan')
+X <- model.matrix( ~ sex + state ,data=data)
+original_name <- colnames(X)
+X <- cbind(X,data$age,data$asset_value,data$months_employed)
+colnames(X) <- c(original_name, 'age','asset value','month employed')
+N <- dim(data)[1]
+D <- 3
+y <- matrix(NA,ncol =N,nrow =D)
+for (i in 1:N){
+  if (data$y[i] == 0){y[i] <- c(0,0,0)}
+  else if(data$y[i] == 1){y[i] <- c(0,1,0)}
+  else{y[i] <- c(0,0,1)}
+}
+sampe_data <- list(K = dim(X)[2],
+                   D = D,
+                   N = N,
+                   y = ,
+                   x = list(data$sex,data$asset_value,data$))
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
