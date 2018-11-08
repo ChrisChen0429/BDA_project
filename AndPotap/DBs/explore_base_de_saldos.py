@@ -19,7 +19,7 @@
 import os
 import numpy as np
 import pandas as pd
-from Andres_Potapczynski.Utils.eda import one_col_summary
+from AndPotap.Utils.eda import one_col_summary
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Open DBs
