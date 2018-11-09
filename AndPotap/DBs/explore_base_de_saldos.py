@@ -24,10 +24,9 @@ from AndPotap.Utils.eda import one_col_summary
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Open DBs
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-path = '/Users/andpotap/Documents/Columbia/BS/Risk-Managment'
-os.chdir(path)
-file_it = './DBs/BASE DE SALDOS FHIPO IT PESOS AGOSTO-18.xlsx.txt'
-file_s = './DBs/BASE DE SALDOS FHIPO SOCIAL PESOS_AGOSTO-18.xlsx.txt'
+print(os.getcwd())
+file_it = './BASE DE SALDOS FHIPO IT PESOS AGOSTO-18.xlsx.txt'
+file_s = './BASE DE SALDOS FHIPO SOCIAL PESOS_AGOSTO-18.xlsx.txt'
 
 data_it = pd.read_table(file_it)
 data_s = pd.read_table(file_s)
@@ -79,6 +78,6 @@ data.loc[data['months_wo'] >= 1, 'y'] = 1
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Output the file
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-file_path = './DBs/core_y.txt'
+file_path = './core_y.txt'
 data.to_csv(file_path, sep='|', index=False)
 # ===========================================================================

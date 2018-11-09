@@ -4,22 +4,20 @@
 """
 (*) This script explores the contents of the DBs given by the client
 (*) Beware! This file writes an output
+(*) Also make sure that your working directory is properly set
 """
-# TODO: missing to transform the entries into the most suitable format
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Imports
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 import numpy as np
 import pandas as pd
-from Utils.eda import one_col_summary
+# from Utils.eda import one_col_summary
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Open DBs
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# data = pd.read_excel('../DBs/Base de originacion FHIPO.xlsx', nrows=10)
-# data = pd.read_excel('../DBs/Base de originacion FHIPO.xlsx')
-data = pd.read_excel('./DBs/Base de originacion FHIPO.xlsx')
+data = pd.read_excel('./AndPotap/DBs/Base de originacion FHIPO.xlsx')
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Output list of columns to excel
@@ -31,10 +29,10 @@ data = pd.read_excel('./DBs/Base de originacion FHIPO.xlsx')
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Explore columns contents
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-col = 'Nombre'
-column = 'idpoliticasValidacion'
+# col = 'Nombre'
+# column = 'idpoliticasValidacion'
 
-df = one_col_summary(data=data, column=column, col=col)
+# df = one_col_summary(data=data, column=column, col=col)
 
 # for colu in list(data.columns):
 #     df = one_col_summary(data=data, column=colu, col=col)
@@ -113,9 +111,21 @@ renaming_dict = {'Nombre': 'mortgage_product',
 data_sub = data_sub.rename(columns=renaming_dict)
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Load the y label data
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+file_y = './AndPotap/DBs/core_y.txt'
+data_y = pd.read_csv(file_y, sep='|')
+# ===========================================================================
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Combine the data sets
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+data_sub = pd.merge(left=data_sub, right=data_y, how='inner',
+                    on='mortgage_id')
+# ===========================================================================
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Output the cleaned data set
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-file_path = '../DBs/core.txt'
+file_path = './AndPotap/DBs/core.txt'
 data_sub.to_csv(file_path, sep='|')
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -131,6 +141,6 @@ data_sample = data_sub.iloc[selected_rows, :]
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Output the random sample extract
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-file_path_sample = '../DBs/core_sample.txt'
+file_path_sample = './AndPotap/DBs/core_sample.txt'
 data_sample.to_csv(file_path_sample, sep='|')
 # ===========================================================================
