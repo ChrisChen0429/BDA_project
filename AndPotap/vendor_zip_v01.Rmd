@@ -1,0 +1,155 @@
+---
+title: "Vendor Zip Analysis"
+author: "Andres Potapczynski (ap3635)"
+date: "11/10/2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Imports, echo=FALSE, message=FALSE, warning=FALSE}
+library(rstan)
+library(tidyverse)
+library(ggplot2)
+library(gridExtra)
+library(bayesplot)
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+```
+
+# Summary
+
+The purpose of this `Rmarkdown` is to see [...]
+# Run the analysis
+
+## Load the data
+
+```{r Load the data, message=FALSE, warning=FALSE}
+file <-  './DBs/core.txt'
+data <- read_delim(file = file, delim = '|')
+
+# Sample the data
+# pct = 1
+pct = 0.1
+# pct = 0.01
+set.seed(seed = 42)
+sample_size = round(pct * nrow(data))
+sample <- sample(x = nrow(data), size = sample_size, replace = F)
+data = data[sample, ]
+
+# Change column format
+data$postal_code = factor(data$postal_code)
+```
+
+Let's understand the distribution of the zip codes in the DB.
+```{r Distribution of vendors and zip in the data}
+# Vendors
+vendor_summary = data %>% 
+  group_by(vendor_name) %>% 
+  summarize(mort_no = n(), 
+            y_sum = sum(y), 
+            income_bar = mean(client_income), 
+            factor_bar = mean(factor_employed),
+            lender_bar = mean(lender_score),
+            risk_bar = mean(risk_index),
+            ratio_bar = mean(ratio),
+            asset_val = mean(asset_market_value)) %>% 
+  mutate(theta_emp = y_sum / mort_no) %>% 
+  arrange(desc(mort_no)) %>% ungroup()
+
+vendor_summary$ID_vendor = seq.int(nrow(vendor_summary))
+
+N_d = vendor_summary$mort_no
+y_d = vendor_summary$y_sum
+D = nrow(vendor_summary)
+
+# Zip codes
+zip_summary = data %>% 
+  group_by(postal_code, city, state) %>% 
+  summarize(mort_no = n(), 
+            y_sum = sum(y), 
+            income_bar = mean(client_income), 
+            factor_bar = mean(factor_employed),
+            lender_bar = mean(lender_score),
+            risk_bar = mean(risk_index),
+            ratio_bar = mean(ratio),
+            asset_val = mean(asset_market_value)) %>% 
+  mutate(theta_emp = y_sum / mort_no) %>% 
+  arrange(desc(mort_no)) %>% ungroup()
+
+zip_summary$ID_zip = seq.int(nrow(zip_summary))
+
+N_m = zip_summary$mort_no
+y_m = zip_summary$y_sum
+M = nrow(zip_summary)
+
+# Both
+mix_summary = data %>% 
+  group_by(postal_code, vendor_name) %>% 
+  summarize(mort_no = n(), 
+            y_sum = sum(y), 
+            income_bar = mean(client_income), 
+            factor_bar = mean(factor_employed),
+            lender_bar = mean(lender_score),
+            risk_bar = mean(risk_index),
+            ratio_bar = mean(ratio),
+            asset_val = mean(asset_market_value)) %>% 
+  mutate(theta_emp = y_sum / mort_no) %>% 
+  arrange(desc(mort_no)) %>% ungroup()
+
+mix_summary <- mix_summary %>% 
+  inner_join(y = zip_summary[, c('postal_code', 'ID_zip')], by = 'postal_code') %>% 
+  inner_join(y = vendor_summary[, c('vendor_name', 'ID_vendor')], by = 'vendor_name')
+
+# mix_summary[, c('postal_code', 'vendor_name', 'ID_zip', 'ID_vendor')]
+
+ind_d = mix_summary$ID_vendor
+ind_m = mix_summary$ID_zip
+N = mix_summary$mort_no
+Total = nrow(mix_summary)
+y = mix_summary$y_sum
+```
+
+Now, I compile the proposed STAN model.
+```{r Compile the hierarchical STAN model for mix analysis}
+sm <- stan_model('./mix_model.stan')
+sm.join <- stan_model('./mix_model_v01.stan')
+```
+
+## Run first approach
+
+The data for the first model is
+
+```{r Generate data for the first approach, eval=FALSE}
+inputs = list(M=M, D=D, N_m=N_m, N_d=N_d, y_m=y_m, y_d=y_d, N=N, y=y)
+model.fit = sampling(sm, data=inputs)
+```
+
+```{r Print the results of the first approach, eval=FALSE}
+print(model.fit, digits=2, pars = c('alpha_m', 'beta_m', 'alpha_d', 'beta_d'))
+```
+
+## Run second approach
+```{r Generate data for the second approach}
+inputs = list(M=M, D=D, N_m=N_m, N_d=N_d, y_m=y_m, y_d=y_d, N=N, y=y)
+model.fit2 = sampling(sm.join, data=inputs)
+```
+
+```{r Print the results of the second approach}
+print(model.fit2, digits=2, pars = c('alpha_m', 'beta_m', 'alpha_d', 'beta_d'))
+```
+
+# Concluding remarks
+
+Add the resulting $\theta_j$s to the `vendor summary` table.
+
+```{r Merge back}
+# sims.poi = rstan::extract(model.fit)
+# theta_poi = apply(X = sims.poi$theta, MARGIN = 2, FUN = median)
+# vendor_summary$theta_poi = theta_poi
+# path = './DBs/vendor.txt'
+# write_csv(x = vendor_summary, path = path)
+```
+
