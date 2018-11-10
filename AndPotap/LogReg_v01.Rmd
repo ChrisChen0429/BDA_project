@@ -1,5 +1,5 @@
 ---
-title: "Untitled"
+title: "Logistic Regression Take 01"
 author: "Andres Potapczynski (ap3635)"
 date: "11/9/2018"
 output: pdf_document
@@ -9,22 +9,250 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r Imports, echo=FALSE, message=FALSE, warning=FALSE}
+library(rstan)
+library(tidyverse)
+library(ggplot2)
+library(gridExtra)
+library(bayesplot)
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
+# Results from first logistic regression
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r Load the data, warning=FALSE, message=FALSE, echo=FALSE}
+# Load provisional data set
+# file <-  './DBs/core_sample.txt'
+file <-  './DBs/core.txt'
+data <- read_delim(file = file, delim = '|')
+
+# Sample the data
+pct = 0.1
+set.seed(seed = 42)
+sample_size = round(pct * nrow(data))
+sample <- sample(x = nrow(data), size = sample_size, replace = F)
+data = data[sample, ]
+
+# Change column format
+data$new_used = factor(x = data$new_used, levels = c('U', 'N'))
+data$sex = factor(x = data$sex, levels = c(1, 2))
+data$postal_code = as.integer(data$postal_code)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+## Plot variable distributions
+
+Now we have the following age distribution
+
+```{r Plot age distribution, echo=FALSE}
+ggplot(data = data, mapping = aes(x=age)) +
+  geom_histogram(binwidth = 1, fill='lightblue', color='black') +
+  xlab('Age (years)') + 
+  ylab('Count') + 
+  labs(title='Young adults are more prevalent in the data', 
+       subtitle = 'Age distribution') + 
+  theme(plot.title = element_text(size = 12, face='bold')) + 
+  theme(plot.subtitle = element_text(size = 10))
+```
+
+Also, the distribution of the number of elements per zip code is the following
+
+```{r Plot zipcode information, eval=FALSE}
+zip_summary = data %>% 
+  group_by(postal_code) %>% 
+  summarize(mort_no = n()) %>% 
+  arrange(desc(mort_no))
+
+reversal = zip_summary %>% 
+  group_by(mort_no) %>% 
+  summarize(count = n())
+ggplot(data = reversal, mapping = aes(x = count)) +
+  geom_histogram(binwidth = 10, fill='lightblue', color='black') +
+  xlab('No of mortages') + 
+  ylab('Count') + 
+  xlim(0, 100) +
+  labs(title='...', 
+       subtitle = 'Number of mortgages per zip code') + 
+  theme(plot.title = element_text(size = 12, face='bold')) + 
+  theme(plot.subtitle = element_text(size = 10))
+```
+
+## Run model
+
+```{r Select the relevant columns for the analysis}
+y = data$y
+data_sub <- data %>% select(client_income,
+                        ratio,
+                        age,
+                        asset_market_value,
+                        lender_score,
+                        factor_employed,
+                        risk_index)
+summary(data_sub)
+```
+
+## Evaluate the model
+
+I compile the model to access it later and then run it in a separate code chunk.
+
+```{r Compile the STAN model}
+sm <- stan_model('./logistic_reg_v01.stan')
+```
+
+
+```{r Function to replay analysis}
+### Debug this function
+single_analysis <- function(var, data, y, sm){
+  input_data = data %>% select(var)
+  inputs = list(N = nrow(input_data), D=ncol(input_data), X=input_data, y=y)
+  model.fit = sampling(sm, data=inputs, verbose=F)
+  return(model.fit)
+}
+```
+
+
+### For age only
+
+```{r Compile the STAN model for age}
+input_data = data_sub %>% select(age)
+inputs = list(N = nrow(input_data), D=ncol(input_data), X=input_data, y=y)
+```
+
+```{r Run the STAN model for age, echo=FALSE}
+model_v01 = sampling(sm, data=inputs, verbose=F)
+```
+
+The results are the following
+```{r Print results of model v01 for age}
+print(model_v01, digits = 2)
+```
+
+### For risk index only
+
+```{r Compile the STAN model for risk index}
+input_data = data_sub %>% select(risk_index)
+inputs = list(N = nrow(input_data), D=ncol(input_data), X=input_data, y=y)
+```
+
+```{r Run the STAN model for risk index, echo=FALSE}
+model_v01 = sampling(sm, data=inputs, verbose=F)
+```
+
+The results are the following
+```{r Print results of model v01 for risk index}
+print(model_v01, digits = 2)
+```
+
+### For asset market value only
+
+```{r Compile the STAN model for asset market value}
+input_data = data_sub %>% select(asset_market_value)
+inputs = list(N = nrow(input_data), D=ncol(input_data), X=input_data, y=y)
+```
+
+```{r Run the STAN model for asset market value, echo=FALSE}
+model_v01 = sampling(sm, data=inputs, verbose=F)
+```
+
+The results are the following
+```{r Print results of model v01 for asset market value}
+print(model_v01, digits = 2)
+```
+
+were we see that there was a lot of problem with convergence in this case.
+
+### For client income
+
+```{r Compile the STAN model for client income}
+input_data = data_sub %>% select(client_income)
+inputs = list(N = nrow(input_data), D=ncol(input_data), X=input_data, y=y)
+```
+
+```{r Run the STAN model for client income, echo=FALSE}
+model_v01 = sampling(sm, data=inputs, verbose=F)
+```
+
+The results are the following
+```{r Print results of model v01 for client income}
+print(model_v01, digits = 2)
+```
+
+were there is convergence but, yet again, one of the variables is not important again.
+
+### For ratio
+
+```{r Compile the STAN model for ratio}
+input_data = data_sub %>% select(ratio)
+inputs = list(N = nrow(input_data), D=ncol(input_data), X=input_data, y=y)
+```
+
+```{r Run the STAN model for ratio, echo=FALSE}
+model_v01 = sampling(sm, data=inputs, verbose=F)
+```
+
+The results are the following
+```{r Print results of model v01 for ratio}
+print(model_v01, digits = 2)
+```
+
+were, so far, this is the only variable that has shown some significance.
+
+```{r Extract variables for ratio}
+sims = rstan::extract(model_v01)
+alpha_mean = apply(X = sims$alpha, MARGIN = 1, FUN = mean)
+beta_mean = apply(X = sims$beta, MARGIN = 1, FUN = mean)
+true_params = c(alpha_mean, beta_mean)
+posterior_params = as.matrix(model_v01, pars=c('alpha', 'beta'))
+# mcmc_recover_hist(posterior_params)
+mcmc_hist(posterior_params, binwidth = 0.25)
+```
+
+
+### For lender score
+
+```{r Compile the STAN model for lender score}
+input_data = data_sub %>% select(lender_score)
+inputs = list(N = nrow(input_data), D=ncol(input_data), X=input_data, y=y)
+```
+
+```{r Run the STAN model for lender score, echo=FALSE}
+model_v01 = sampling(sm, data=inputs, verbose=F)
+```
+
+The results are the following
+```{r Print results of model v01 for lender score}
+print(model_v01, digits = 2)
+```
+
+were apparently there is a little effect.
+
+```{r Extract variables for lender score}
+sims = rstan::extract(model_v01)
+alpha_mean = apply(X = sims$alpha, MARGIN = 1, FUN = mean)
+beta_mean = apply(X = sims$beta, MARGIN = 1, FUN = mean)
+true_params = c(alpha_mean, beta_mean)
+posterior_params = as.matrix(model_v01, pars=c('alpha', 'beta'))
+# mcmc_recover_hist(posterior_params)
+mcmc_hist(posterior_params)
+```
+
+### For factor employed
+
+```{r Compile the STAN model for factor employed}
+input_data = data_sub %>% select(factor_employed)
+inputs = list(N = nrow(input_data), D=ncol(input_data), X=input_data, y=y)
+```
+
+```{r Run the STAN model for factor employed, echo=FALSE}
+model_v01 = sampling(sm, data=inputs, verbose=F)
+```
+
+The results are the following
+```{r Print results of model v01 for factor employed}
+print(model_v01, digits = 2)
+```
+
+were in the previous variable the beta never went past 0 but here we do have this effect.
+
+###

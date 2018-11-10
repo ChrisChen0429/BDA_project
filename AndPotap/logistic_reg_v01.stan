@@ -1,12 +1,13 @@
 data {
   int<lower=0> N;
-  int<lower=0> M;
-  row_vector[M] x[N];
+  int<lower=0> D;
+  matrix[N, D] X;
   int<lower=0, upper=1> y[N];
 } parameters {
   real alpha;
-  vector[M] beta;
+  vector[D] beta;
 } model {
-  for (i in 1:N)
-    y[i] ~ bernoulli_logit(alpha + dot_product(beta, x[i]));
+  alpha ~ normal(0, 5);
+  beta ~ normal(0, 5);
+  y ~ bernoulli_logit(X * beta + alpha);
 }

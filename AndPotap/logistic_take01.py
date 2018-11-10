@@ -48,4 +48,3 @@ logreg.fit(X=X_train, y=y_train)
 score_all = logreg.score(X=X_test, y=y_test)
 print('\nThe predicted score value is {:4.3f}'.format(score_all))
 # ===========================================================================
-
