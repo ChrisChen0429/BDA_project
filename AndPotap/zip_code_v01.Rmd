@@ -1,0 +1,139 @@
+---
+title: "Zip Code Smoothing"
+author: "Andres Potapczynski (ap3635)"
+date: "11/9/2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Imports, echo=FALSE, message=FALSE, warning=FALSE}
+library(rstan)
+library(tidyverse)
+library(ggplot2)
+library(gridExtra)
+library(bayesplot)
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+```
+
+# Summary
+
+The purpose of this `Rmarkdown` is to see whether it makes sense that the zip codes have different default probabilities or else all can be regularized. The first approach will be to regularized them as if they come from the same distribution. The second approach will be to see if they come from a mixture.
+
+The proposed model is the following
+$$
+y_j \sim Binomial(n_j, \theta_j)
+$$
+and each $\theta_j$ is assumed to come from a Beta distribution.
+
+$$
+\theta_j \sim Beta(\alpha, \beta)
+$$
+
+where the hyperparameters can be obtained via
+$$
+\alpha \sim Ga(2, 2)
+$$
+and 
+$$
+\beta \sim Ga(2, 2)
+$$
+The second approach has the following generative process [...]
+
+# Run the analysis
+
+## Load the data
+
+```{r Load the data, message=FALSE, warning=FALSE}
+file <-  './DBs/core.txt'
+data <- read_delim(file = file, delim = '|')
+
+# Sample the data
+pct = 1
+# pct = 0.05
+set.seed(seed = 42)
+sample_size = round(pct * nrow(data))
+sample <- sample(x = nrow(data), size = sample_size, replace = F)
+data = data[sample, ]
+
+# Change column format
+data$postal_code = factor(data$postal_code)
+```
+
+Let's understand the distribution of the zip codes in the DB.
+```{r Distribution of zip_codes in the data}
+zip_summary = data %>% 
+  # group_by(postal_code, state) %>% 
+  # group_by(postal_code) %>% 
+  group_by(postal_code, city, state) %>% 
+  summarize(mort_no = n(), y_sum = sum(y)) %>% 
+  mutate(theta_emp = y_sum / mort_no) %>% 
+  arrange(desc(mort_no))
+
+N = zip_summary$mort_no
+y = zip_summary$y_sum
+M = nrow(zip_summary)
+```
+
+The distribution of the zip codes is
+
+```{r Plot empirical dist of default per each zip code, eval=FALSE}
+ggplot(data = zip_summary, mapping = aes(x=theta_emp)) +
+  geom_histogram(fill='lightblue', color='black', binwidth = 0.05)
+```
+
+```{r Plot the zipcode vs probability of default, eval=FALSE}
+ggplot(data = zip_summary, mapping = aes(x=postal_code, y=theta_emp)) +
+  geom_point()
+```
+
+
+Now, I compile the proposed STAN model.
+```{r Compile the hierarchical STAN model}
+sm <- stan_model('./zip_code_v01.stan')
+```
+
+## Run first approach
+
+The data for the first model is
+
+```{r Generate data for the first approach}
+inputs = list(M=M, N=N, y=y)
+model.v01 = sampling(sm, data=inputs)
+```
+
+```{r Print the results of the first approach}
+print(model.v01, digits=2, pars = c('alpha', 'beta'))
+```
+
+### Look at the shrinkage of the model
+
+```{r Extract the thetas, eval=FALSE}
+sims = rstan::extract(model.v01)
+theta = apply(X = sims$theta, MARGIN = 2, FUN = median)
+df = data.frame(theta=theta)
+g_post <- ggplot(data = df, mapping = aes(x = theta)) +
+  geom_histogram(fill='lightblue', color='black', binwidth = 0.01)
+g_post
+```
+
+### Generate data
+
+```{r Generate y_rep for evaluation}
+sims = rstan::extract(model.v01)
+y_rep_max = apply(X = sims$y_rep, MARGIN = 1, FUN = max)
+df_rep = data.frame(y_rep_max = y_rep_max)
+ggplot(data = df_rep, mapping = aes(x = y_rep_max)) + 
+  geom_histogram(binwidth = 1) +
+  geom_vline(xintercept = max(zip_summary$y_sum))
+```
+
+
+## Run second approach
+[...]
+
+# Concluding remarks
+[...]
