@@ -1,0 +1,120 @@
+---
+title: "Vendor Smoothing"
+author: "Andres Potapczynski (ap3635)"
+date: "11/10/2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Imports, echo=FALSE, message=FALSE, warning=FALSE}
+library(rstan)
+library(tidyverse)
+library(ggplot2)
+library(gridExtra)
+library(bayesplot)
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+```
+
+# Summary
+
+The purpose of this `Rmarkdown` is to see whether it makes sense that the zip codes have different default probabilities or else all can be regularized. The first approach will be to regularized them as if they come from the same distribution. The second approach will be to see if they come from a mixture.
+
+The proposed model is the following
+$$
+y_j \sim Binomial(n_j, \theta_j)
+$$
+and we will also try
+$$
+y_j \sim Poisson(n_j \theta_j)
+$$
+since the Poisson distribution is more suitable for rare events.
+
+Moreover, each $\theta_j$ is assumed to come from a Beta distribution.
+
+$$
+\theta_j \sim Beta(\alpha, \beta)
+$$
+
+where the hyperparameters can be obtained via
+$$
+\alpha \sim Ga(2, 2)
+$$
+and 
+$$
+\beta \sim Ga(2, 2)
+$$
+
+# Run the analysis
+
+## Load the data
+
+```{r Load the data, message=FALSE, warning=FALSE}
+file <-  './DBs/core.txt'
+data <- read_delim(file = file, delim = '|')
+
+# Sample the data
+pct = 1
+# pct = 0.1
+# pct = 0.01
+set.seed(seed = 42)
+sample_size = round(pct * nrow(data))
+sample <- sample(x = nrow(data), size = sample_size, replace = F)
+data = data[sample, ]
+
+# Change column format
+data$postal_code = factor(data$postal_code)
+```
+
+Let's understand the distribution of the zip codes in the DB.
+```{r Distribution of zip_codes in the data}
+vendor_summary = data %>% 
+  group_by(vendor_name) %>% 
+  summarize(mort_no = n(), 
+            y_sum = sum(y), 
+            income_bar = mean(client_income), 
+            factor_bar = mean(factor_employed),
+            lender_bar = mean(lender_score),
+            risk_bar = mean(risk_index),
+            ratio_bar = mean(ratio),
+            asset_val = mean(asset_market_value)) %>% 
+  mutate(theta_emp = y_sum / mort_no) %>% 
+  arrange(desc(mort_no))
+
+N = vendor_summary$mort_no
+y = vendor_summary$y_sum
+M = nrow(vendor_summary)
+```
+
+Now, I compile the proposed STAN model.
+```{r Compile the hierarchical STAN model for 1}
+sm <- stan_model('./zip_code_v02.stan')
+```
+
+## Run first approach
+
+The data for the first model is
+
+```{r Generate data for the first approach}
+inputs = list(M=M, N=N, y=y)
+model.fit = sampling(sm, data=inputs)
+```
+
+```{r Print the results of the first approach}
+print(model.fit, digits=2, pars = c('alpha', 'beta'))
+```
+
+# Concluding remarks
+
+Add the resulting $\theta_j$s to the `vendor summary` table.
+
+```{r Merge back}
+sims.poi = rstan::extract(model.fit)
+theta_poi = apply(X = sims.poi$theta, MARGIN = 2, FUN = median)
+vendor_summary$theta_poi = theta_poi
+path = './DBs/vendor.txt'
+write_csv(x = vendor_summary, path = path)
+```
