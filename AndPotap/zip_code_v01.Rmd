@@ -27,7 +27,13 @@ The proposed model is the following
 $$
 y_j \sim Binomial(n_j, \theta_j)
 $$
-and each $\theta_j$ is assumed to come from a Beta distribution.
+and we will also try
+$$
+y_j \sim Poisson(n_j \theta_j)
+$$
+since the Poisson distribution is more suitable for rare events.
+
+Moreover, each $\theta_j$ is assumed to come from a Beta distribution.
 
 $$
 \theta_j \sim Beta(\alpha, \beta)
@@ -53,7 +59,8 @@ data <- read_delim(file = file, delim = '|')
 
 # Sample the data
 pct = 1
-# pct = 0.05
+# pct = 0.1
+# pct = 0.01
 set.seed(seed = 42)
 sample_size = round(pct * nrow(data))
 sample <- sample(x = nrow(data), size = sample_size, replace = F)
@@ -69,7 +76,14 @@ zip_summary = data %>%
   # group_by(postal_code, state) %>% 
   # group_by(postal_code) %>% 
   group_by(postal_code, city, state) %>% 
-  summarize(mort_no = n(), y_sum = sum(y)) %>% 
+  summarize(mort_no = n(), 
+            y_sum = sum(y), 
+            income_bar = mean(client_income), 
+            factor_bar = mean(factor_employed),
+            lender_bar = mean(lender_score),
+            risk_bar = mean(risk_index),
+            ratio_bar = mean(ratio),
+            asset_val = mean(asset_market_value)) %>% 
   mutate(theta_emp = y_sum / mort_no) %>% 
   arrange(desc(mort_no))
 
@@ -85,14 +99,16 @@ ggplot(data = zip_summary, mapping = aes(x=theta_emp)) +
   geom_histogram(fill='lightblue', color='black', binwidth = 0.05)
 ```
 
-```{r Plot the zipcode vs probability of default, eval=FALSE}
-ggplot(data = zip_summary, mapping = aes(x=postal_code, y=theta_emp)) +
+```{r Plot the zipcode vs probability of default, eval=TRUE}
+zip_df <- zip_summary
+# zip_df = zip_summary %>% filter(theta_emp > 0)
+ggplot(data = zip_df, mapping = aes(x=income_bar, y=theta_emp)) +
   geom_point()
 ```
 
 
 Now, I compile the proposed STAN model.
-```{r Compile the hierarchical STAN model}
+```{r Compile the hierarchical STAN model for 1}
 sm <- stan_model('./zip_code_v01.stan')
 ```
 
@@ -111,13 +127,25 @@ print(model.v01, digits=2, pars = c('alpha', 'beta'))
 
 ### Look at the shrinkage of the model
 
-```{r Extract the thetas, eval=FALSE}
+```{r Extract the thetas for the first model, eval=TRUE}
 sims = rstan::extract(model.v01)
 theta = apply(X = sims$theta, MARGIN = 2, FUN = median)
 df = data.frame(theta=theta)
 g_post <- ggplot(data = df, mapping = aes(x = theta)) +
-  geom_histogram(fill='lightblue', color='black', binwidth = 0.01)
+  geom_histogram(fill='lightblue', color='black', binwidth = 0.01) +
+  ggtitle('Beta-Binomial Model') +
+  xlim(0, 0.2) +
+  ylim(0, 4500)
 g_post
+```
+
+```{r Plot the regularized parameters}
+sims = rstan::extract(model.v01)
+theta = apply(X = sims$theta, MARGIN = 2, FUN = median)
+df2 <- data.frame(income_bar=zip_summary$income_bar, theta=theta)
+ggplot(data = df2, mapping = aes(x=income_bar, y=theta)) +
+  geom_point() +
+  ylim(0, 1)
 ```
 
 ### Generate data
@@ -133,7 +161,90 @@ ggplot(data = df_rep, mapping = aes(x = y_rep_max)) +
 
 
 ## Run second approach
-[...]
+
+Now, I compile the proposed STAN model.
+```{r Compile the hierarchical STAN model for poisson for 2}
+sm_poi <- stan_model('./zip_code_v02.stan')
+```
+
+The data for the second model is
+
+```{r Generate data for the second approach}
+inputs = list(M=M, N=N, y=y)
+model.v02 = sampling(sm_poi, data=inputs)
+```
+
+```{r Print the results of the second approach}
+print(model.v02, digits=2, pars = c('alpha', 'beta'))
+```
+
+```{r Extract the thetas for the second model, eval=TRUE}
+sims.poi = rstan::extract(model.v02)
+theta = apply(X = sims.poi$theta, MARGIN = 2, FUN = median)
+df = data.frame(theta=theta)
+g_post.poi <- ggplot(data = df, mapping = aes(x = theta)) +
+  geom_histogram(fill='lightblue', color='black', binwidth = 0.01) + 
+  ggtitle('Poisson Model') +
+  xlim(0, 0.2) +
+  ylim(0, 4500)
+gridExtra::grid.arrange(g_post, g_post.poi, nrow=1, ncol=2)
+```
+
+```{r Plot the regularized parameters for Poisson}
+sims.poi = rstan::extract(model.v02)
+theta = apply(X = sims.poi$theta, MARGIN = 2, FUN = median)
+df2 <- data.frame(income_bar=zip_summary$income_bar, theta=theta)
+ggplot(data = df2, mapping = aes(x=income_bar, y=theta)) +
+  geom_point() +
+  ylim(0, 1)
+```
+
+## Run clustering approach
+
+Now, I compile the proposed STAN model.
+```{r Compile the hierarchical STAN model for 3}
+sm_cluster <- stan_model('./zip_code_v03.stan')
+```
+
+The data for the third model is
+
+```{r Generate data for the third approach, eval=FALSE}
+K = 2
+z0 = sample(x = K, size = M, replace=TRUE)
+inputs = list(K=K, M=M, N=N, y=y, a0=rep(1, 2), z=z0)
+model.v03 = sampling(sm_cluster, data=inputs)
+```
+
+```{r Generate data for the clustering approach}
+K = 2
+z0 = sample(x = K, size = M, replace=TRUE)
+inputs = list(K=K, M=M, N=N, y=y, a0=rep(1, 2), z=z0)
+model.opt = optimizing(sm_cluster, data=inputs)
+```
+
+were the results of the model are
+
+```{r Print the results of the third approach, eval=FALSE}
+print(model.v03, digits=2, pars = c('alpha', 'beta', 'phi', 'theta'))
+```
+
+```{r Count the number of bad zip codes, eval=FALSE}
+sims.cluster = rstan::extract(model.v03)
+```
+
 
 # Concluding remarks
+
+Add the resulting $\theta_j$s to the `zip summary` table.
+
+```{r Merge back}
+theta_beta = apply(X = sims$theta, MARGIN = 2, FUN = median)
+theta_poi = apply(X = sims.poi$theta, MARGIN = 2, FUN = median)
+zip_summary$theta_beta = theta_beta
+zip_summary$theta_poi = theta_poi
+path = './DBs/zip.txt'
+write_csv(x = zip_summary, path = path)
+```
+
+
 [...]
