@@ -49,9 +49,7 @@ selected_columns = ['Nombre',
                     'codigo_postal',
                     'Genero',
                     'numero_credito',
-                    'fecha_firma_credito',
                     'factor_pago_roa',
-                    'factor_pago_rea',
                     'tasa_interes',
                     'antiguedad_empleo_titular',
                     'ingresos_cliente_registrado_infonavit',
@@ -89,7 +87,6 @@ renaming_dict = {'Nombre': 'mortgage_product',
                  'numero_credito': 'mortgage_id',
                  'fecha_firma_credito': 'date_signed',
                  'factor_pago_roa': 'factor_employed',
-                 'factor_pago_rea': 'factor_unemployed',
                  'tasa_interes': 'interest_rate',
                  'antiguedad_empleo_titular': 'months_employed',
                  'ingresos_cliente_registrado_infonavit': 'client_income',
@@ -173,7 +170,6 @@ ordered_columns = ['mortgage_id',
                    'sex_F',
                    'condition_U',
                    'factor_employed',
-                   'factor_unemployed',
                    'months_employed',
                    'credit_type',
                    'asset_value',
@@ -214,6 +210,11 @@ cols_2_int = {'mortgage_id': 'int64',
               'age': 'int64',
               'zip': 'int64'}
 data_sub = data_sub.astype(cols_2_int)
+data_sub['date_signed'] = pd.to_datetime(data_sub['date_signed'],
+                                         format='%Y%m%d')
+data_sub['date_start'] = pd.to_datetime(data_sub['date_start'])
+data_sub['last_date_pay'] = pd.to_datetime(data_sub['last_date_pay'])
+data_sub['days_pay'] = data_sub['last_date_pay'] - data_sub['date_start']
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Output the cleaned data set
