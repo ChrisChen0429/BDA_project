@@ -107,7 +107,7 @@ renaming_dict = {'Nombre': 'mortgage_product',
                  'calificacion_buro': 'credit_score',
                  'estado_civil_acreditado': 'married',
                  'Calculado_edad': 'asset_age',
-                 'Monto_credito_original_total_pesos': 'contract_value'}
+                 'Monto_credito_original_total_pesos': 'appraisal_value'}
 data_sub = data_sub.rename(columns=renaming_dict)
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -58,8 +58,8 @@ file <-  './DBs/core.txt'
 data <- read_delim(file = file, delim = '|')
 
 # Sample the data
-pct = 1
-# pct = 0.1
+# pct = 1
+pct = 0.1
 # pct = 0.01
 set.seed(seed = 42)
 sample_size = round(pct * nrow(data))
