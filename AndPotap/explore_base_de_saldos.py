@@ -106,11 +106,25 @@ renaming_dict = {'numcred': 'mortgage_id',
                  'dias_mora': 'days_wo_pay',
                  'num_pag_ef': 'effective_pay',
                  'fec_ori': 'date_start',
-                 'vecimto': 'data_finish',
+                 'vecimto': 'date_finish',
                  'f_ult_pago': 'last_date_pay'}
 data = data.rename(columns=renaming_dict)
 data['y'] = 0
 data.loc[data['months_wo_pay'] >= 1, 'y'] = 1
+# ===========================================================================
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Transform into proper formats: DateTime and Integer
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+date_cols = ['date_start',
+             'date_finish',
+             'last_date_pay']
+for col in date_cols:
+    mask = data[col] > 0
+    data.loc[mask, col] = pd.to_datetime(data.loc[mask, col],
+                                         format='%Y%m%d')
+    mask = data[col] == 0
+    data.loc[mask, col] = pd.NaT
+    data[col] = data[col].astype('datetime64[ns]')
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Output the file
