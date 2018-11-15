@@ -12,7 +12,7 @@
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 import numpy as np
 import pandas as pd
-# from Utils.eda import one_col_summary
+from AndPotap.Utils.eda import one_col_summary
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Open DBs
@@ -79,7 +79,7 @@ renaming_dict = {'Nombre': 'mortgage_product',
                  'colonia_domicilio': 'county',
                  'ciudad_domicilio': 'city',
                  'entidad_federativa': 'state',
-                 'codigo_postal': 'postal_code',
+                 'codigo_postal': 'zip',
                  'Genero': 'sex',
                  'numero_credito': 'mortgage_id',
                  'fecha_firma_credito': 'date_signed',
@@ -100,7 +100,7 @@ renaming_dict = {'Nombre': 'mortgage_product',
                  'nueva_usada': 'new_used',
                  'indice_riesgo': 'risk_index',
                  'tipo_credito': 'credit_type',
-                 'antiguedad_laboral': 'months_employed',
+                 'antiguedad_laboral': 'labor_antiquity',
                  'nombre_empresa': 'employer_name',
                  'edad': 'age',
                  'plazo_propuesto': 'contract_length',
@@ -109,6 +109,74 @@ renaming_dict = {'Nombre': 'mortgage_product',
                  'Calculado_edad': 'asset_age',
                  'Monto_credito_original_total_pesos': 'appraisal_value'}
 data_sub = data_sub.rename(columns=renaming_dict)
+# ===========================================================================
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Explore certain columns
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# col = 'mortgage_id'
+# column = 'sex'
+# column = 'asset_age'
+
+# df = one_col_summary(data=data_sub, column=column, col=col)
+# print(df)
+# ===========================================================================
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Incorporate dummy columns
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+data_sub['sex'] = data_sub['sex'].astype('category')
+sex_encoding = {1.0: 'M', 2.0: 'F'}
+data_sub['sex'] = data_sub['sex'].replace(sex_encoding)
+aux = pd.get_dummies(data=data_sub[['sex', 'new_used']],
+                     prefix=['sex', 'condition'],
+                     columns=['sex', 'new_used'])
+data_sub = pd.merge(left=data_sub,
+                    right=aux,
+                    how='inner',
+                    left_index=True,
+                    right_index=True)
+# ===========================================================================
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Order columns
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ordered_columns = ['mortgage_id',
+                   'state',
+                   'county',
+                   'city',
+                   'zip',
+                   'vendor_name',
+                   'employer_name',
+                   'age',
+                   'sex',
+                   'new_used',
+                   'appraisal_value',
+                   'client_income',
+                   'risk_index',
+                   'ratio',
+                   'lender_score',
+                   'asset_market_value',
+                   'credit_score',
+                   'asset_age',
+                   'labor_antiquity',
+                   'sex_F',
+                   'sex_M',
+                   'condition_N',
+                   'condition_U',
+                   'factor_employed',
+                   'factor_unemployed',
+                   'months_employed',
+                   'credit_type',
+                   'asset_value',
+                   'months_employed',
+                   'state_asset',
+                   'county_asset',
+                   'city_asset',
+                   'postal_code_asset',
+                   'contract_length',
+                   'married',
+                   'mortgage_product',
+                   'date_signed',
+                   'interest_rate']
+data_sub = data_sub[ordered_columns]
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Load the y label data
@@ -121,6 +189,14 @@ data_y = pd.read_csv(file_y, sep='|')
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 data_sub = pd.merge(left=data_sub, right=data_y, how='inner',
                     on='mortgage_id')
+# ===========================================================================
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Convert to proper data types
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+cols_2_int = {'mortgage_id': 'int64',
+              'age': 'int64',
+              'zip': 'int64'}
+data_sub = data_sub.astype(cols_2_int)
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Output the cleaned data set
