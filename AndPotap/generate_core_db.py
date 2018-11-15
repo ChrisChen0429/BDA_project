@@ -12,7 +12,7 @@
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 import numpy as np
 import pandas as pd
-# from AndPotap.Utils.eda import one_col_summary
+from AndPotap.Utils.eda import one_col_summary
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Open DBs
@@ -42,6 +42,7 @@ data = pd.read_excel('./AndPotap/DBs/Base de originacion FHIPO.xlsx')
 # Select columns to include and rename them
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 selected_columns = ['Nombre',
+                    'fecha_firma_credito',
                     'colonia_domicilio',
                     'ciudad_domicilio',
                     'entidad_federativa',
@@ -75,6 +76,10 @@ selected_columns = ['Nombre',
                     'Calculado_edad',
                     'Monto_credito_original_total_pesos']
 data_sub = data[selected_columns]
+# ===========================================================================
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Rename the columns
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 renaming_dict = {'Nombre': 'mortgage_product',
                  'colonia_domicilio': 'county',
                  'ciudad_domicilio': 'city',
@@ -108,17 +113,23 @@ renaming_dict = {'Nombre': 'mortgage_product',
                  'estado_civil_acreditado': 'married',
                  'Calculado_edad': 'asset_age',
                  'Monto_credito_original_total_pesos': 'appraisal_value'}
+# Rename the data set
 data_sub = data_sub.rename(columns=renaming_dict)
+
+# Verify that all columns that are selected are renamed
+c = set(selected_columns).difference(set(renaming_dict))
+print('\nThe number of missing columns to rename is {}'.format(len(c)))
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Explore certain columns
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# col = 'mortgage_id'
 # column = 'sex'
 # column = 'asset_age'
+column = 'new_used'
+col = 'mortgage_id'
 
-# df = one_col_summary(data=data_sub, column=column, col=col)
-# print(df)
+df = one_col_summary(data=data_sub, column=column, col=col)
+print(df)
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Incorporate dummy columns
@@ -129,6 +140,8 @@ data_sub['sex'] = data_sub['sex'].replace(sex_encoding)
 aux = pd.get_dummies(data=data_sub[['sex', 'new_used']],
                      prefix=['sex', 'condition'],
                      columns=['sex', 'new_used'])
+aux = aux.drop('sex_M', axis=1)
+aux = aux.drop('condition_N', axis=1)
 data_sub = pd.merge(left=data_sub,
                     right=aux,
                     how='inner',
@@ -158,8 +171,6 @@ ordered_columns = ['mortgage_id',
                    'asset_age',
                    'labor_antiquity',
                    'sex_F',
-                   'sex_M',
-                   'condition_N',
                    'condition_U',
                    'factor_employed',
                    'factor_unemployed',
@@ -176,6 +187,12 @@ ordered_columns = ['mortgage_id',
                    'mortgage_product',
                    'date_signed',
                    'interest_rate']
+
+# Verify that all columns that are selected are ordered
+c = set(data_sub.columns).difference(set(ordered_columns))
+print('\nThe number missing columns to order are {}'.format(len(c)))
+
+# Order the columns
 data_sub = data_sub[ordered_columns]
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
