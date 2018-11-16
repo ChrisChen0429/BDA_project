@@ -18,7 +18,8 @@ from AndPotap.Utils.eda import one_col_summary
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Files
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-file_input = './AndPotap/DBs/Base de originacion FHIPO.xlsx'
+# file_input = './AndPotap/DBs/Base de originacion FHIPO.xlsx'
+file_input = './AndPotap/DBs/core_raw.txt'
 file_y = './AndPotap/DBs/core_y.txt'
 file_path = './AndPotap/DBs/core.txt'
 file_path_sample = './AndPotap/DBs/core_sample.txt'
@@ -27,7 +28,8 @@ file_path_sample = './AndPotap/DBs/core_sample.txt'
 # Open DBs
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 t0 = time.time()
-data = pd.read_excel(file_input)
+# data = pd.read_excel(file_input)
+data = pd.read_csv(file_input, sep='|')
 print('It takes: {:6.1f} sec to load the data'.format(time.time() - t0))
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -227,6 +229,13 @@ data_sub['date_start'] = pd.to_datetime(data_sub['date_start'])
 data_sub['last_date_pay'] = pd.to_datetime(data_sub['last_date_pay'])
 data_sub['days_pay'] = data_sub['last_date_pay'] - data_sub['date_start']
 data_sub['days_pay'] = data_sub['days_pay'].dt.days
+# ===========================================================================
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Provisional dummy variable for Investors
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+data_sub.loc[:, 'inv'] = 0
+mask = data_sub['city'] != data_sub['city_asset']
+data_sub.loc[mask, 'inv'] = 1
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Output the cleaned data set
