@@ -12,12 +12,23 @@
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 import numpy as np
 import pandas as pd
+import time
 from AndPotap.Utils.eda import one_col_summary
+# ===========================================================================
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# Files
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+file_input = './AndPotap/DBs/Base de originacion FHIPO.xlsx'
+file_y = './AndPotap/DBs/core_y.txt'
+file_path = './AndPotap/DBs/core.txt'
+file_path_sample = './AndPotap/DBs/core_sample.txt'
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Open DBs
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-data = pd.read_excel('./AndPotap/DBs/Base de originacion FHIPO.xlsx')
+t0 = time.time()
+data = pd.read_excel(file_input)
+print('It takes: {:6.1f} sec to load the data'.format(time.time() - t0))
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Output list of columns to excel
@@ -96,7 +107,7 @@ renaming_dict = {'Nombre': 'mortgage_product',
                  'valor_compra_venta': 'asset_value',
                  'colonia_compra': 'county_asset',
                  'ciudad_compra': 'city_asset',
-                 'codigo_postal_compra': 'postal_code_asset',
+                 'codigo_postal_compra': 'zip_asset',
                  'entidad_federativa_compra': 'state_asset',
                  'valor_avaluo': 'asset_market_value',
                  'nueva_usada': 'new_used',
@@ -170,14 +181,13 @@ ordered_columns = ['mortgage_id',
                    'sex_F',
                    'condition_U',
                    'factor_employed',
-                   'months_employed',
                    'credit_type',
                    'asset_value',
                    'months_employed',
                    'state_asset',
                    'county_asset',
                    'city_asset',
-                   'postal_code_asset',
+                   'zip_asset',
                    'contract_length',
                    'married',
                    'mortgage_product',
@@ -194,7 +204,6 @@ data_sub = data_sub[ordered_columns]
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Load the y label data
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-file_y = './AndPotap/DBs/core_y.txt'
 data_y = pd.read_csv(file_y, sep='|')
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -208,19 +217,21 @@ data_sub = pd.merge(left=data_sub, right=data_y, how='inner',
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 cols_2_int = {'mortgage_id': 'int64',
               'age': 'int64',
-              'zip': 'int64'}
+              'zip': 'int64',
+              'zip_asset': 'int64',
+              'credit_score': 'int64'}
 data_sub = data_sub.astype(cols_2_int)
 data_sub['date_signed'] = pd.to_datetime(data_sub['date_signed'],
                                          format='%Y%m%d')
 data_sub['date_start'] = pd.to_datetime(data_sub['date_start'])
 data_sub['last_date_pay'] = pd.to_datetime(data_sub['last_date_pay'])
 data_sub['days_pay'] = data_sub['last_date_pay'] - data_sub['date_start']
+data_sub['days_pay'] = data_sub['days_pay'].dt.days
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Output the cleaned data set
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-file_path = './AndPotap/DBs/core.txt'
-data_sub.to_csv(file_path, sep='|')
+data_sub.to_csv(file_path, sep='|', index=False)
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Sample a small amount of the data set
@@ -235,6 +246,5 @@ data_sample = data_sub.iloc[selected_rows, :]
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Output the random sample extract
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-file_path_sample = './AndPotap/DBs/core_sample.txt'
-data_sample.to_csv(file_path_sample, sep='|')
+data_sample.to_csv(file_path_sample, sep='|', index=False)
 # ===========================================================================
