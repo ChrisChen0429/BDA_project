@@ -1,0 +1,215 @@
+---
+title: "Zip Code Hierarchical Model"
+author: "Andres Potapczynski (ap3635)"
+date: "11/16/2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Imports, echo=FALSE, message=FALSE, warning=FALSE}
+library(rstan)
+library(tidyverse)
+library(ggplot2)
+library(gridExtra)
+library(bayesplot)
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+```
+
+```{r Files}
+file_data <-  '../DBs/core.txt'
+file_model <- './zip_hlr_v01.stan'
+file_output <-  '../DBs/zip_hlr.txt'
+file_model_poisson <- './zip_code_v02.stan'
+file_mode_betabin <- './zip_code_v01.stan'
+# file_mode_betabin_hl <- './zip_code_v04.stan'
+file_mode_betabin_hl <- './zip_code_v05.stan'
+```
+
+# Results from first logistic regression
+
+```{r Load the data, warning=FALSE, message=FALSE, echo=FALSE}
+## Load the data set
+data <- read_delim(file = file_data, delim = '|')
+
+## Sample the data
+# pct = 1
+pct = 0.1
+# pct = 0.01
+set.seed(seed = 42)
+sample_size = round(pct * nrow(data))
+sample_entries <- sample(x = nrow(data), size = sample_size, replace = F)
+data = data[sample_entries, ]
+
+## Subset
+data_sub <- data %>% 
+  group_by(state, city, zip) %>% 
+  summarize(cases = sum(y),
+            counts = n(),
+            theta_emp = cases / counts) %>% 
+  arrange(desc(cases)) %>% 
+  ungroup()
+summary(data_sub)
+
+## Shuffle
+sample_entries <- sample(x = nrow(data_sub), size = nrow(data_sub), replace = F)
+data_sub = data_sub[sample_entries, ]
+
+## Create inputs for STAN
+y = data_sub$cases
+N_z = data_sub$counts
+inputs_stan = list(Z=nrow(data_sub), N_z=N_z, y=y)
+```
+
+## Run model
+
+```{r Compile the model}
+sm <- stan_model(file_model)
+```
+
+asdf
+
+```{r Run the model with inverse logit, eval=FALSE}
+sm.hlr = sampling(sm, data=inputs_stan, iter=1000, chains=4)
+```
+
+```{r Print results}
+print(sm.hlr, digits = 2, pars=c('beta', 'sigma', 'lp__'))
+```
+
+## Run second approach
+
+Now, I compile the proposed STAN model.
+```{r Compile the hierarchical STAN model for poisson for 2}
+sm_poi <- stan_model(file_model_poisson)
+inputs = list(M=nrow(data_sub), N=N_z, y=y)
+```
+
+The data for the second model is
+
+```{r Generate data for the second approach, eval=FALSE}
+sm.poisson = sampling(sm_poi, data=inputs)
+```
+
+```{r Print the results of the second approach}
+print(sm.poisson, digits=2, pars = c('alpha', 'beta', 'lp__'))
+```
+
+## Run beta-binomial approach
+
+Now, I compile the proposed STAN model.
+```{r Compile the hierarchical STAN model for 1}
+compile_betabin <- stan_model(file_mode_betabin)
+inputs_betabin = list(M=nrow(data_sub), N=N_z, y=y)
+```
+
+The data for the first model is
+
+```{r Generate data for the first approach, eval=FALSE}
+sm.betabin = sampling(compile_betabin, data=inputs_betabin)
+```
+
+```{r Print the results of the first approach}
+print(sm.betabin, digits=2, pars = c('alpha', 'beta', 'lp__'))
+```
+
+## Run beta-binomial approach with hierarchy
+
+Now, I compile the proposed STAN model.
+```{r Compile the hierarchical STAN model for 1}
+compile_betabin_hl <- stan_model(file_mode_betabin_hl)
+```
+
+```{r Input for Hierarchical Model}
+# city = data %>% 
+#   group_by(city) %>% 
+#   summarize(city_n = n()) %>% 
+#   mutate(city_ID = row_number()) %>% 
+#   ungroup()
+# 
+# data_city <- data_sub %>% 
+#   inner_join(city, by='city')
+# 
+# cc = data_city$city_ID
+#   
+# inputs_betabin_hl = list(Z=nrow(data_sub), C=nrow(city), cc=cc, N_z=N_z, y=y)
+```
+
+```{r Input for Hierarchical Model by state}
+state = data %>% 
+  group_by(state) %>% 
+  summarize(state_n = n()) %>% 
+  mutate(state_ID = row_number()) %>% 
+  ungroup()
+
+data_state <- data_sub %>% 
+  inner_join(state, by='state')
+
+cc = data_state$state_ID
+  
+inputs_betabin_hl = list(Z=nrow(data_sub), C=nrow(state), cc=cc, N_z=N_z, y=y)
+```
+
+```{r Hierarchical beta-bin, eval=FALSE}
+sm.betabin.hl = sampling(compile_betabin_hl, data=inputs_betabin_hl)
+```
+
+```{r Print the results of the first approach}
+print(sm.betabin.hl, digits=2, pars = c('alpha_a0', 'alpha_b0',
+                                        'beta_a0', 'beta_b0',
+                                        'lp__'))
+```
+
+# Save output
+
+```{r Extract sims}
+sims <- rstan::extract(sm.hlr)
+theta = apply(X = sims$theta, MARGIN = 2, FUN = median)
+```
+
+```{r Extract sims poissons}
+sims.poi = rstan::extract(sm.poisson)
+theta.poi = apply(X = sims.poi$theta, MARGIN = 2, FUN = median)
+```
+
+```{r Extract sims betabin}
+sims.betabin = rstan::extract(sm.betabin)
+theta.betabin = apply(X = sims.betabin$theta, MARGIN = 2, FUN = median)
+```
+
+```{r Extract sims betabin with hierarchy}
+sims.betabin.hl = rstan::extract(sm.betabin.hl)
+theta.betabin.hl = apply(X = sims.betabin.hl$theta, MARGIN = 2, FUN = median)
+```
+
+```{r Merge back}
+data_sub$theta = theta
+data_sub$theta.poi = theta.poi
+data_sub$theta.betabin = theta.betabin
+data_sub$theta.betabin.hl = theta.betabin.hl
+write_csv(x = data_sub, path = file_output)
+```
+
+## Plots less data
+```{r Smoothing plot, eval=FALSE}
+ggplot(data = data_sub, mapping = aes(x = theta, y = theta_emp)) +
+  geom_point() +
+  geom_point(aes(x = theta.poi, y = theta_emp), color='grey') +
+  geom_point(aes(x = theta.betabin, y = theta_emp), color='blue') +
+  geom_point(aes(x = theta.betabin.hl, y = theta_emp), color='red') +
+  ylim(0, 1)
+```
+
+## Plots
+```{r Smoothing plot, eval=FALSE}
+ggplot(data = data_sub, mapping = aes(x = theta, y = theta_emp)) +
+  geom_point() +
+  geom_point(aes(x = theta.poi, y = theta_emp), color='grey') +
+  geom_point(aes(x = theta.betabin, y = theta_emp), color='blue') +
+  geom_point(aes(x = theta.betabin.hl, y = theta_emp), color='red') +
+  ylim(0, 1)
+```
+

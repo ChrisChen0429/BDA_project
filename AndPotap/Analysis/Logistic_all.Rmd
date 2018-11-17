@@ -1,0 +1,151 @@
+---
+title: "Logistic"
+author: "Andres Potapczynski (ap3635)"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Imports, echo=FALSE, message=FALSE, warning=FALSE}
+library(rstan)
+library(tidyverse)
+library(ggplot2)
+library(gridExtra)
+library(bayesplot)
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+```
+
+```{r Files}
+file <-  '../DBs/core.txt'
+```
+
+
+# Results from first logistic regression
+
+```{r Load the data, warning=FALSE, message=FALSE, echo=FALSE}
+## Load the data set
+data <- read_delim(file = file, delim = '|')
+
+## Sample the data
+pct = 1
+# pct = 0.1
+set.seed(seed = 42)
+sample_size = round(pct * nrow(data))
+sample <- sample(x = nrow(data), size = sample_size, replace = F)
+data = data[sample, ]
+```
+
+```{r Count how many zips have various states}
+## The key thing is that for state and city zip is uniquely defined, not for county though
+zip <- data %>% 
+  group_by(zip) %>% 
+  summarize(state_n = n_distinct(city)) %>% 
+  ungroup()
+```
+
+```{r Select the relevant columns for the analysis}
+data_sub <- data %>% select(client_income,
+                        ratio,
+                        age,
+                        sex_F,
+                        condition_U,
+                        effective_pay,
+                        factor_employed,
+                        inv,
+                        risk_index,
+                        y)
+summary(data_sub)
+```
+
+```{r Filter to exclude NA's or other errors}
+print('The current dimension of the data is')
+print(dim(data_sub))
+
+## Filter incorrect values
+inputs <- data_sub %>% 
+  filter(risk_index > 0,
+         effective_pay > 0)
+print('Filtering makes us')
+print(dim(inputs))
+y = inputs$y
+inputs <- inputs %>% select(-y)
+summary(inputs)
+```
+
+asdf
+
+```{r Scale the data}
+inputs <- inputs %>% 
+  mutate_at(.funs = scale, .vars = c('client_income',
+                                     'ratio',
+                                     'age',
+                                     'effective_pay',
+                                     'factor_employed',
+                                     'risk_index'))
+  
+```
+
+asdf
+
+```{r Compile the model}
+inputs_stan = list(N=nrow(inputs), D=ncol(inputs), X=inputs, y=y)
+sm <- stan_model('./logistic_reg_v01.stan')
+```
+
+asdf
+
+```{r Run the model}
+sm.logistic1 = sampling(sm, data=inputs_stan, iter=1000, chains=4)
+```
+
+```{r Print results}
+print(sm.logistic1, digits = 2)
+```
+
+```{r MAP estimate}
+sm.logistic.opt1 = optimizing(sm, data=inputs_stan)
+
+```
+
+
+```{r Display variables}
+colnames(inputs)
+```
+
+asdf
+
+```{r}
+inputs2 <- inputs %>% select(-effective_pay)
+inputs_stan2 <- list(N=nrow(inputs2), D=ncol(inputs2), X=inputs2, y=y)
+sm.logistic2 = sampling(sm, data=inputs_stan2, iter=1000, chains=4)
+```
+
+```{r}
+print(sm.logistic2, digits = 2)
+```
+
+asdf
+
+```{r}
+inputs3 <- inputs %>% select(effective_pay)
+inputs_stan3 <- list(N=nrow(inputs3), D=ncol(inputs3), X=inputs3, y=y)
+sm.logistic3 = sampling(sm, data=inputs_stan3, iter=1000, chains=4)
+```
+
+asdf
+
+```{r}
+print(sm.logistic3, digits = 2)
+```
+
+
+asdf
+
+```{r}
+colnames(inputs3)
+```
+
+asdf
