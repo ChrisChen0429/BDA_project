@@ -9,6 +9,7 @@
 # ===========================================================================
 # Import packages
 # ===========================================================================
+import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans
 # ===========================================================================
@@ -20,6 +21,7 @@ from sklearn.cluster import KMeans
 
 def k_means_addition(k, df, selected_columns, seed):
     x = df[selected_columns].values
+    x = (x - np.mean(x, axis=0)) / np.std(x, axis=0)
     df_out = df['mortgage_id'].copy()
     df_out = pd.DataFrame(df_out)
 
