@@ -12,6 +12,8 @@
 import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans
+np.set_printoptions(precision=2,
+                    formatter={'all': lambda x: '%4.2f' % x})
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # ===========================================================================
@@ -20,12 +22,15 @@ from sklearn.cluster import KMeans
 
 
 def k_means_addition(k, df, selected_columns, seed):
+    # Create data matrix
     x = df[selected_columns].values
-    x = (x - np.mean(x, axis=0)) / np.std(x, axis=0)
+    mu = np.mean(x, axis=0)
+    sigma = np.std(x, axis=0)
+    x = (x - mu) / sigma
     df_out = df['mortgage_id'].copy()
     df_out = pd.DataFrame(df_out)
 
-    # Peform k means
+    # Perform k means
     kmeans = KMeans(n_clusters=k,
                     random_state=seed).fit(x)
 
@@ -33,6 +38,9 @@ def k_means_addition(k, df, selected_columns, seed):
     name = 'cluster_' + str(k)
     df_out[name] = kmeans.labels_
 
-    return df_out, kmeans.cluster_centers_
+    # De-normalize the clusters
+    clusters = (kmeans.cluster_centers_ * sigma) + mu
+
+    return df_out, clusters
 
 # ===========================================================================
