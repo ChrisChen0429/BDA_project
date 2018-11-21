@@ -58,7 +58,7 @@ df_selected = df[selected_columns]
 x = df_selected.values
 
 # Normalize the data
-x = (x - np.mean(x, axis=1)) / np.std(x, axis=1)
+x = (x - np.mean(x, axis=0)) / np.std(x, axis=0)
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # ===========================================================================
@@ -81,20 +81,20 @@ print('A total of {} dimensions represent 80% of '
 # ===========================================================================
 # Extract the information from Kernel PCA
 # ===========================================================================
-t0 = time.time()
-kpca = KernelPCA(n_components=10,
-                 kernel='rbf',
-                 n_jobs=-1).fit(x)
-
-# noinspection PyUnresolvedReferences
-s_kpca = kpca.lambdas_
-print('\nKernel PCA took: {:6.1f} sec'.format(time.time() - t0))
-
-total_kpca = np.sum(s_kpca)
-ss_kpca = np.cumsum(s_kpca) / total_kpca
-dim_80_kpca = len(ss_kpca[ss_kpca < 0.8])
-print('A total of {} dimensions represent 80% of '
-      'the data'.format(dim_80_kpca))
+# t0 = time.time()
+# kpca = KernelPCA(n_components=10,
+#                  kernel='rbf',
+#                  n_jobs=-1).fit(x)
+#
+# # noinspection PyUnresolvedReferences
+# s_kpca = kpca.lambdas_
+# print('\nKernel PCA took: {:6.1f} sec'.format(time.time() - t0))
+#
+# total_kpca = np.sum(s_kpca)
+# ss_kpca = np.cumsum(s_kpca) / total_kpca
+# dim_80_kpca = len(ss_kpca[ss_kpca < 0.8])
+# print('A total of {} dimensions represent 80% of '
+#       'the data'.format(dim_80_kpca))
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # ===========================================================================
@@ -105,10 +105,10 @@ plt.title('PCA eigenvalues')
 plt.plot(s_pca, color='blue', label='PCA')
 plt.legend()
 plt.show()
-
-plt.figure()
-plt.title('KPCA eigenvalues')
-plt.plot(s_kpca, color='red', label='KPCA')
-plt.legend()
-plt.show()
+#
+# plt.figure()
+# plt.title('KPCA eigenvalues')
+# plt.plot(s_kpca, color='red', label='KPCA')
+# plt.legend()
+# plt.show()
 # ===========================================================================
