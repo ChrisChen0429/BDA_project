@@ -47,8 +47,8 @@ selected_columns = [
     'lender_score',
     'asset_market_value',
     'credit_score',
-    'factor_employed',
-    'effective_pay'
+    'effective_pay',
+    'factor_employed'
 ]
 
 # Subset
@@ -66,6 +66,7 @@ x = (x - np.mean(x, axis=0)) / np.std(x, axis=0)
 # ===========================================================================
 t0 = time.time()
 pca = PCA(n_components=10).fit(x)
+# pca = PCA(n_components=9).fit(x)
 
 # noinspection PyUnresolvedReferences
 s_pca = pca.singular_values_

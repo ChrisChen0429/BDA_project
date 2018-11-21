@@ -30,7 +30,8 @@ os.chdir('/Users/andpotap/Documents/Columbia/BS/BDA_project')
 file_input = './AndPotap/DBs/core.txt'
 
 # Output
-file_output = './AndPotap/DBs/core_clusters.txt'
+# file_output = './AndPotap/DBs/core_clusters.txt'
+file_output = './AndPotap/DBs/core_clusters_no_eff_pay.txt'
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # ===========================================================================
@@ -49,8 +50,8 @@ selected_columns = [
     'ratio',
     'lender_score',
     'asset_market_value',
-    'factor_employed',
-    'effective_pay'
+    # 'effective_pay',
+    'factor_employed'
 ]
 # x = df[selected_columns].values
 # ===========================================================================
