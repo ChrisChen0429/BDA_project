@@ -34,14 +34,14 @@ functions {
   }
 }
 data {
-  int<lower = 1> n;
-  int<lower = 1> k;
-  int<lower = 1> p;
-  matrix[k, p] X;
-  int<lower = 0> y[k];
-  int<lower=1> state[k];
+  int<lower = 1> n;                     // number of state
+  int<lower = 1> k;                     // number of record
+  int<lower = 1> p;                     // number of non-geo parameter
+  matrix[k, p] X;                       // raw data matrix
+  int<lower = 0> y[k];                  // response
+  int<lower=1> state[k];                // state indicator
   matrix<lower = 0, upper = 1>[n, n] W; // adjacency matrix
-  int W_n;                // number of adjacent region pairs
+  int W_n;                              // number of adjacent region pairs
 }
 transformed data {
   int W_sparse[W_n, 2];   // adjacency pairs
@@ -83,3 +83,8 @@ model {
   tau ~ gamma(2, 2);
   y ~ bernoulli_logit(X * beta + phi[state]); 
 }
+generated quantities {
+    int<lower = 0> y_rep[k];  
+    for (i in 1:k){
+      y_rep[i] =  bernoulli_logit_rng(X[i,] * beta + phi[state[i]]); 
+}}
