@@ -10,8 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ## data cleaning
 
 ```{r}
-data <- read.delim2('core.txt', header = TRUE,sep = '|',quote = "\n")
-data <- data[5:nrow(data),]
+data <- read.csv('../data/core.txt',sep = '|')
 ## the first 4 lines seems to be wrong, delete it
 #rand_y <- sample(c(0,1,2),size = length(data$y),prob = c(0.7,0.2,0.1),replace = T)
 #data$y <- rand_y
@@ -111,8 +110,13 @@ rstan_options(auto_write = TRUE)
 
 ```{r}
 model <- stan_model('yi.stan')
-X <- cbind(data$sex,data$age,data$asset_market_value,data$months_employed,data$ratio)
-colnames(X) <- c('sex', 'age','asset market value','month employed','ratio')
+data$client_income <- log(data$client_income)
+data$asset_market_value =log(data$asset_market_value)
+X <- cbind(data$client_income,
+           data$age,
+           data$asset_market_value,
+           data$factor_employed)
+colnames(X) <- c('client_income', 'age','asset market value','factor_employed employed')
 scaled_x <- scale(X)
 y = as.numeric(data$y)
 y[y==1] = 0
@@ -124,19 +128,35 @@ for (i in 1:32){
   state[state==s] = as.numeric(i)
 }
 state = as.numeric(state)
-X <- model.matrix(~scaled_x)
+#sampled <- sample(1:nrow(X),size =  round(nrow(X) / 10),replace = T)
+#X <- scaled_x[sampled,]
+#y <- y[sampled]
+#state <- state[sampled]
 data_list <- list(k = nrow(X),         # number of observations
                n = nrow(A),
                p = ncol(X),         # number of coefficients
                X = X,               # design matrix
                y = y,               # observed number of cases
                W = A,
-               k = 32,
                W_n = sum(A) / 2,    # number of neighbor pairs
                state = state)               # adjacency matrix
 fit <- sampling(model, data = data_list)
-print(fit)
+print(fit, pars = c('beta','phi'))
 ```
 
+```{r}
+library(bayesplot)
+
+y_rep <- as.matrix(fit, pars = "y_rep")
+ppc_dens_overlay(y = data_list$y, yrep = y_rep[1:200, ])
+
+
+prop_zero <- function(x) mean(x == 0)
+ppc_stat(y = data_list$y, yrep = y_rep, stat = "min")
+
+mean_y_rep <- colMeans(y_rep)
+std_resid <- ( data_list$y - mean_y_rep) / sqrt(mean_y_rep)
+qplot(mean_y_rep, std_resid) + hline_at(2) + hline_at(-2)
+```
 
 
