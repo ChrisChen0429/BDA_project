@@ -16,3 +16,9 @@
 /AndPotap/DBs/mix_instance.txt
 /AndPotap/.Rhistory
 /.Rhistory
+/.DS_Store
+/AndPotap/.RData
+/AndPotap/DBs/core_clusters.txt
+/AndPotap/DBs/core_raw.txt
+/AndPotap/DBs/core_clusters_no_eff_pay.txt
+/AndPotap/DBs/zip_hlr.txt
