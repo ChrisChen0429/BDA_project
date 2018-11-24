@@ -147,16 +147,24 @@ print(fit, pars = c('beta','phi'))
 ```{r}
 library(bayesplot)
 
-y_rep <- as.matrix(fit, pars = "y_rep")
-ppc_dens_overlay(y = data_list$y, yrep = y_rep[1:200, ])
+select_vec <- which(data$state %in% unique(data$state)[5:10])
+ppc_stat_grouped(y = data$y[select_vec], 
+  yrep = y_rep[,select_vec], group = data$state[select_vec], stat = 'sd') 
+#> `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
+select_vec <- which(data$sex %in% unique(data$sex))
+ppc_stat_grouped(y = data$y[select_vec], 
+  yrep = y_rep[,select_vec], group = data$sex[select_vec], stat = 'sd') 
+
+select_vec <- which(data$age %in% unique(data$age)[1:10])
+ppc_stat_grouped(y = data$y[select_vec], 
+  yrep = y_rep[,select_vec], group = data$age[select_vec], stat = 'sd') 
+
+data$factor_employed
+select_vec <- which(data$factor_employed %in% unique(data$factor_employed)[1:5])
+ppc_stat_grouped(y = data$y[select_vec], 
+  yrep = y_rep[,select_vec], group = data$factor_employed[select_vec], stat = 'sd') 
 
 
-prop_zero <- function(x) mean(x == 0)
-ppc_stat(y = data_list$y, yrep = y_rep, stat = "min")
-
-mean_y_rep <- colMeans(y_rep)
-std_resid <- ( data_list$y - mean_y_rep) / sqrt(mean_y_rep)
-qplot(mean_y_rep, std_resid) + hline_at(2) + hline_at(-2)
 ```
 
 

@@ -79,7 +79,7 @@ parameters {
 }
 model {
   phi ~ sparse_car(tau, alpha, W_sparse, D_sparse, lambda, n, W_n);
-  beta ~ normal(0, 1);
+  beta ~ cauchy(0, 1);
   tau ~ gamma(2, 2);
   y ~ bernoulli_logit(X * beta + phi[state]); 
 }
