@@ -90,10 +90,7 @@ selected_columns = ['Nombre',
                     'antiguedad_laboral',
                     'nombre_empresa',
                     'edad',
-                    'plazo_propuesto',
                     'calificacion_buro',
-                    'estado_civil_acreditado',
-                    'Calculado_edad',
                     'Monto_credito_original_total_pesos']
 data_sub = data[selected_columns]
 # ===========================================================================
@@ -132,10 +129,7 @@ renaming_dict = {'Nombre': 'mortgage_product',
                  'antiguedad_laboral': 'labor_antiquity',
                  'nombre_empresa': 'employer_name',
                  'edad': 'age',
-                 'plazo_propuesto': 'contract_length',
                  'calificacion_buro': 'credit_score',
-                 'estado_civil_acreditado': 'married',
-                 'Calculado_edad': 'asset_age',
                  'Monto_credito_original_total_pesos': 'appraisal_value'}
 # Rename the data set
 data_sub = data_sub.rename(columns=renaming_dict)
@@ -208,21 +202,21 @@ data_sub['days_pay'] = data_sub['days_pay'].dt.days
 # ===========================================================================
 # Provisional dummy variable for Investors
 # ===========================================================================
-data_sub.loc[:, 'inv_city'] = 0
-mask = data_sub['city'] != data_sub['city_asset']
-data_sub.loc[mask, 'inv_city'] = 1
-
-data_sub.loc[:, 'inv_state'] = 0
-mask = data_sub['state'] != data_sub['state_asset']
-data_sub.loc[mask, 'inv_state'] = 1
-
-data_sub.loc[:, 'inv_county'] = 0
-mask = data_sub['county'] != data_sub['county_asset']
-data_sub.loc[mask, 'inv_county'] = 1
-
-data_sub.loc[:, 'inv_zip'] = 0
-mask = data_sub['zip'] != data_sub['zip_asset']
-data_sub.loc[mask, 'inv_zip'] = 1
+# data_sub.loc[:, 'inv_city'] = 0
+# mask = data_sub['city'] != data_sub['city_asset']
+# data_sub.loc[mask, 'inv_city'] = 1
+#
+# data_sub.loc[:, 'inv_state'] = 0
+# mask = data_sub['state'] != data_sub['state_asset']
+# data_sub.loc[mask, 'inv_state'] = 1
+#
+# data_sub.loc[:, 'inv_county'] = 0
+# mask = data_sub['county'] != data_sub['county_asset']
+# data_sub.loc[mask, 'inv_county'] = 1
+#
+# data_sub.loc[:, 'inv_zip'] = 0
+# mask = data_sub['zip'] != data_sub['zip_asset']
+# data_sub.loc[mask, 'inv_zip'] = 1
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # ===========================================================================
@@ -275,33 +269,30 @@ ordered_columns = ['mortgage_id',
                    'age',
                    'sex',
                    'asset_market_value',
+                   'mar_2_app',
+                   'appraisal_value',
+                   'app_2_inc',
                    'client_income',
-                   'risk_index',
-                   'factor_employed',
+                   'mar_2_inc',
                    'sex_F',
                    'condition_U',
-                   'mar_2_inc',
-                   'app_2_inc',
-                   'mar_2_val',
+                   'y',
+                   'risk_index',
+                   'effective_pay',
+                   'factor_employed',
                    'bank_2_home',
-                   'mar_2_app',
                    'ratio',
                    'vendor_Y',
                    'employed_30',
                    'antiquity_20',
-                   'inv_city',
-                   'inv_state',
-                   'inv_county',
-                   'inv_zip',
                    'credit_score',
                    'lender_score',
-                   'y',
+                   'mar_2_val',
                    'bank_total',
                    'home_total',
                    'bank_monthly',
                    'home_monthly',
                    'days_pay',
-                   'effective_pay',
                    'days_wo_pay',
                    'months_wo_pay',
                    'date_start',
@@ -309,8 +300,6 @@ ordered_columns = ['mortgage_id',
                    'last_date_pay',
                    'origin',
                    'new_used',
-                   'appraisal_value',
-                   'asset_age',
                    'labor_antiquity',
                    'credit_type',
                    'asset_value',
@@ -319,8 +308,6 @@ ordered_columns = ['mortgage_id',
                    'county_asset',
                    'city_asset',
                    'zip_asset',
-                   'contract_length',
-                   'married',
                    'mortgage_product',
                    'date_signed',
                    'interest_rate']

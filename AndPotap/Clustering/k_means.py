@@ -11,7 +11,7 @@
 # Import packages
 # ===========================================================================
 import os
-# import numpy as np
+import numpy as np
 import pandas as pd
 from AndPotap.Utils.cluster import k_means_addition
 import multiprocessing
@@ -31,7 +31,7 @@ file_input = './AndPotap/DBs/core.txt'
 
 # Output
 # file_output = './AndPotap/DBs/core_clusters.txt'
-file_output = './AndPotap/DBs/core_clusters_no_eff_pay.txt'
+file_output = './AndPotap/DBs/core_clusters2.txt'
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # ===========================================================================
@@ -43,17 +43,27 @@ df = pd.read_csv(filepath_or_buffer=file_input, sep='|')
 # ===========================================================================
 # Select relevant columns
 # ===========================================================================
+# Before
+# selected_columns = [
+#     'age',
+#     'client_income',
+#     'risk_index',
+#     'ratio',
+#     'lender_score',
+#     'asset_market_value',
+#     # 'effective_pay',
+#     'factor_employed'
+# ]
+# New selection
 selected_columns = [
     'age',
-    'client_income',
-    'risk_index',
-    'ratio',
-    'lender_score',
     'asset_market_value',
-    # 'effective_pay',
-    'factor_employed'
+    'client_income',
+    'mar_2_inc',
+    'appraisal_value',
+    'app_2_inc',
+    'mar_2_app'
 ]
-# x = df[selected_columns].values
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # ===========================================================================
@@ -89,6 +99,12 @@ for j in range(T):
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # ===========================================================================
+# Print default per cluster
+# ===========================================================================
+print(df.groupby(by='cluster_7').agg({'y': [np.mean, np.ma.count]}))
+# ===========================================================================
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# ===========================================================================
 # Write output
 # ===========================================================================
 df.to_csv(path_or_buf=file_output, sep='|', index=False)
@@ -97,8 +113,6 @@ df.to_csv(path_or_buf=file_output, sep='|', index=False)
 # ===========================================================================
 # Results from 1 pass
 # ===========================================================================
-# df.groupby(by='cluster_20').agg({'y': [np.mean, np.ma.count]})
-
 # Cluster default rates
 #                  y
 #                mean count
