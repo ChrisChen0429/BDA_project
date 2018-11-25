@@ -21,7 +21,6 @@ from AndPotap.Utils.regular import clean_vendor
 # ===========================================================================
 # Files
 # ===========================================================================
-# file_input = './AndPotap/DBs/Base de originacion FHIPO.xlsx'
 file_input = './AndPotap/DBs/core_raw.txt'
 file_y = './AndPotap/DBs/core_y.txt'
 file_path = './AndPotap/DBs/core.txt'
@@ -32,7 +31,6 @@ file_path_sample = './AndPotap/DBs/core_sample.txt'
 # Open DBs
 # ===========================================================================
 t0 = time.time()
-# data = pd.read_excel(file_input)
 data = pd.read_csv(file_input, sep='|')
 print('It takes: {:6.1f} sec to load the data'.format(time.time() - t0))
 # ===========================================================================
@@ -260,6 +258,7 @@ ordered_columns = ['mortgage_id',
                    'inv_state',
                    'inv_county',
                    'inv_zip',
+                   'vendor_Y',
                    'employed_30',
                    'antiquity_20',
                    'lender_score',
