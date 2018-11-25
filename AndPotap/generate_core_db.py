@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 import time
 from AndPotap.Utils.eda import one_col_summary
+from AndPotap.Utils.regular import clean_vendor
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # ===========================================================================
@@ -169,52 +170,6 @@ data_sub = pd.merge(left=data_sub,
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # ===========================================================================
-# Order columns
-# ===========================================================================
-ordered_columns = ['mortgage_id',
-                   'state',
-                   'county',
-                   'city',
-                   'zip',
-                   'vendor_name',
-                   'employer_name',
-                   'age',
-                   'sex',
-                   'new_used',
-                   'appraisal_value',
-                   'client_income',
-                   'risk_index',
-                   'ratio',
-                   'lender_score',
-                   'asset_market_value',
-                   'credit_score',
-                   'asset_age',
-                   'labor_antiquity',
-                   'sex_F',
-                   'condition_U',
-                   'factor_employed',
-                   'credit_type',
-                   'asset_value',
-                   'months_employed',
-                   'state_asset',
-                   'county_asset',
-                   'city_asset',
-                   'zip_asset',
-                   'contract_length',
-                   'married',
-                   'mortgage_product',
-                   'date_signed',
-                   'interest_rate']
-
-# Verify that all columns that are selected are ordered
-c = set(data_sub.columns).difference(set(ordered_columns))
-print('\nThe number missing columns to order are {}'.format(len(c)))
-
-# Order the columns
-data_sub = data_sub[ordered_columns]
-# ===========================================================================
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# ===========================================================================
 # Load the y label data
 # ===========================================================================
 data_y = pd.read_csv(file_y, sep='|')
@@ -247,9 +202,100 @@ data_sub['days_pay'] = data_sub['days_pay'].dt.days
 # ===========================================================================
 # Provisional dummy variable for Investors
 # ===========================================================================
-data_sub.loc[:, 'inv'] = 0
+data_sub.loc[:, 'inv_city'] = 0
 mask = data_sub['city'] != data_sub['city_asset']
-data_sub.loc[mask, 'inv'] = 1
+data_sub.loc[mask, 'inv_city'] = 1
+
+data_sub.loc[:, 'inv_state'] = 0
+mask = data_sub['state'] != data_sub['state_asset']
+data_sub.loc[mask, 'inv_state'] = 1
+
+data_sub.loc[:, 'inv_county'] = 0
+mask = data_sub['county'] != data_sub['county_asset']
+data_sub.loc[mask, 'inv_county'] = 1
+
+data_sub.loc[:, 'inv_zip'] = 0
+mask = data_sub['zip'] != data_sub['zip_asset']
+data_sub.loc[mask, 'inv_zip'] = 1
+# ===========================================================================
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# ===========================================================================
+# Add threshold dummies
+# ===========================================================================
+data_sub.loc[:, 'employed_30'] = 0
+mask = data_sub['months_employed'] < 30
+data_sub.loc[mask, 'employed_30'] = 1
+
+data_sub.loc[:, 'antiquity_20'] = 0
+mask = data_sub['labor_antiquity'] < 20
+data_sub.loc[mask, 'antiquity_20'] = 1
+# ===========================================================================
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# ===========================================================================
+# Clean the vendor's name
+# ===========================================================================
+data_sub.loc[:, 'vendor_Y'] = clean_vendor(vendor=data_sub['vendor_name'])
+# ===========================================================================
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# ===========================================================================
+# Order columns
+# ===========================================================================
+ordered_columns = ['mortgage_id',
+                   'state',
+                   'county',
+                   'city',
+                   'zip',
+                   'vendor_name',
+                   'employer_name',
+                   'age',
+                   'sex',
+                   'asset_market_value',
+                   'client_income',
+                   'risk_index',
+                   'ratio',
+                   'factor_employed',
+                   'sex_F',
+                   'condition_U',
+                   'inv_city',
+                   'inv_state',
+                   'inv_county',
+                   'inv_zip',
+                   'employed_30',
+                   'antiquity_20',
+                   'lender_score',
+                   'y',
+                   'days_wo_pay',
+                   'effective_pay',
+                   'days_pay',
+                   'months_wo_pay',
+                   'date_start',
+                   'date_finish',
+                   'last_date_pay',
+                   'origin',
+                   'new_used',
+                   'credit_score',
+                   'appraisal_value',
+                   'asset_age',
+                   'labor_antiquity',
+                   'credit_type',
+                   'asset_value',
+                   'months_employed',
+                   'state_asset',
+                   'county_asset',
+                   'city_asset',
+                   'zip_asset',
+                   'contract_length',
+                   'married',
+                   'mortgage_product',
+                   'date_signed',
+                   'interest_rate']
+
+# Verify that all columns that are selected are ordered
+c = set(data_sub.columns).difference(set(ordered_columns))
+print('\nThe number missing columns to order are {}'.format(len(c)))
+
+# Order the columns
+data_sub = data_sub[ordered_columns]
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # ===========================================================================
