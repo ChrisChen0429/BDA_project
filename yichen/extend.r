@@ -1,24 +1,5 @@
----
-title: "Project_Yi"
-output: html_document
----
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
-## data cleaning
-
-```{r}
 data <- read.csv('../data/core.txt',sep = '|')
-## the first 4 lines seems to be wrong, delete it
-#rand_y <- sample(c(0,1,2),size = length(data$y),prob = c(0.7,0.2,0.1),replace = T)
-#data$y <- rand_y
-```
 
-
-Prepare for the space matrix
-```{r}
 N = length(unique(data$state))
 A <- matrix(0,ncol = N,nrow = N)
 colnames(A) = unique(data$state)
@@ -87,16 +68,14 @@ A['TLAXCALA',c('ESTADO DE MEXICO','HIDALGO','PUEBLA')] = 1
 A[c('ESTADO DE MEXICO','HIDALGO','PUEBLA'),'TLAXCALA'] = 1
 A['OAXACA',c('GUERRERO','PUEBLA','VERACRUZ LLAVE','CHIAPAS')] = 1
 A[c('GUERRERO','PUEBLA','VERACRUZ LLAVE','CHIAPAS'),'OAXACA'] =1
-```
 
-```{r}
+
 library(rstan)
 options(mc.cores = parallel::detectCores())
 rstan_options(auto_write = TRUE)
-```
 
-```{r}
-model <- stan_model('baseline.stan')
+
+model <- stan_model('yi.stan')
 data$client_income <- log(data$client_income)
 data$asset_market_value =log(data$asset_market_value)
 X <- cbind(data$client_income,
@@ -104,7 +83,6 @@ X <- cbind(data$client_income,
            data$asset_market_value,
            data$factor_employed)
 colnames(X) <- c('client_income', 'age','asset market value','factor_employed employed')
-scaled_x <- scale(X)
 y = as.numeric(data$y)
 y[y==1] = 0
 y[y==2] = 1
@@ -128,31 +106,4 @@ data_list <- list(k = nrow(X),         # number of observations
                W_n = sum(A) / 2,    # number of neighbor pairs
                state = state)               # adjacency matrix
 fit <- sampling(model, data = data_list)
-print(fit, pars = c('beta','phi'.'lp_'))
-```
-
-```{r}
-library(bayesplot)
-library(shinystan)
-
-select_vec <- which(data$state %in% unique(data$state)[5:10])
-ppc_stat_grouped(y = data$y[select_vec], 
-  yrep = y_rep[,select_vec], group = data$state[select_vec], stat = 'sd') 
-#> `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
-select_vec <- which(data$sex %in% unique(data$sex))
-ppc_stat_grouped(y = data$y[select_vec], 
-  yrep = y_rep[,select_vec], group = data$sex[select_vec], stat = 'sd') 
-
-select_vec <- which(data$age %in% unique(data$age)[1:10])
-ppc_stat_grouped(y = data$y[select_vec], 
-  yrep = y_rep[,select_vec], group = data$age[select_vec], stat = 'sd') 
-
-data$factor_employed
-select_vec <- which(data$factor_employed %in% unique(data$factor_employed)[1:5])
-ppc_stat_grouped(y = data$y[select_vec], 
-  yrep = y_rep[,select_vec], group = data$factor_employed[select_vec], stat = 'sd') 
-
-
-```
-
-
+ print(fit, pars = c('beta','phi'))
