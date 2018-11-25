@@ -1,13 +1,11 @@
 ---
-title: "Project_Yi"
+title: "Geo_extension.Rmd"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-
-## data cleaning
 
 ```{r}
 data <- read.csv('../data/core.txt',sep = '|')
@@ -96,7 +94,7 @@ rstan_options(auto_write = TRUE)
 ```
 
 ```{r}
-model <- stan_model('baseline.stan')
+model <- stan_model('geo_extend.stan')
 data$client_income <- log(data$client_income)
 data$asset_market_value =log(data$asset_market_value)
 X <- cbind(data$client_income,
@@ -115,6 +113,14 @@ for (i in 1:32){
   state[state==s] = as.numeric(i)
 }
 state = as.numeric(state)
+
+county = as.vector(data$county)
+unique_c = unique(county)
+for (i in 1:length(unique_c)){
+  c = as.character(unique_c[i])
+  county[county==c] = as.numeric(i)
+}
+county = as.numeric(county)
 #sampled <- sample(1:nrow(X),size =  round(nrow(X) / 10),replace = T)
 #X <- scaled_x[sampled,]
 #y <- y[sampled]
@@ -126,33 +132,20 @@ data_list <- list(k = nrow(X),         # number of observations
                y = y,               # observed number of cases
                W = A,
                W_n = sum(A) / 2,    # number of neighbor pairs
-               state = state)               # adjacency matrix
+               state = state,
+               county = county,
+               c = length(unique_c))               # adjacency matrix
 fit <- sampling(model, data = data_list)
-print(fit, pars = c('beta','phi'.'lp_'))
+print(fit, pars = c('beta','phi','lp__'))
 ```
 
 ```{r}
 library(bayesplot)
 library(shinystan)
-
-select_vec <- which(data$state %in% unique(data$state)[5:10])
-ppc_stat_grouped(y = data$y[select_vec], 
-  yrep = y_rep[,select_vec], group = data$state[select_vec], stat = 'sd') 
-#> `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
-select_vec <- which(data$sex %in% unique(data$sex))
-ppc_stat_grouped(y = data$y[select_vec], 
-  yrep = y_rep[,select_vec], group = data$sex[select_vec], stat = 'sd') 
-
-select_vec <- which(data$age %in% unique(data$age)[1:10])
-ppc_stat_grouped(y = data$y[select_vec], 
-  yrep = y_rep[,select_vec], group = data$age[select_vec], stat = 'sd') 
-
-data$factor_employed
-select_vec <- which(data$factor_employed %in% unique(data$factor_employed)[1:5])
-ppc_stat_grouped(y = data$y[select_vec], 
-  yrep = y_rep[,select_vec], group = data$factor_employed[select_vec], stat = 'sd') 
-
+ss_mod = as.shinystan(fit)
+launch_shinystan(ss_mod)
 
 ```
+
 
 
