@@ -68,6 +68,10 @@ selected_columns = ['Nombre',
                     'Genero',
                     'numero_credito',
                     'factor_pago_roa',
+                    'importe_original_credito_porcion_banco_pesos',
+                    'importe_original_credito_porcion_infonavit_pesos',
+                    'importe_original_porcion_banco_vsm',
+                    'importe_original_porcion_infonavit_vsm',
                     'tasa_interes',
                     'antiguedad_empleo_titular',
                     'ingresos_cliente_registrado_infonavit',
@@ -106,6 +110,10 @@ renaming_dict = {'Nombre': 'mortgage_product',
                  'numero_credito': 'mortgage_id',
                  'fecha_firma_credito': 'date_signed',
                  'factor_pago_roa': 'factor_employed',
+                 'importe_original_credito_porcion_banco_pesos': 'bank_total',
+                 'importe_original_credito_porcion_infonavit_pesos': 'home_total',
+                 'importe_original_porcion_banco_vsm': 'bank_monthly',
+                 'importe_original_porcion_infonavit_vsm': 'home_monthly',
                  'tasa_interes': 'interest_rate',
                  'antiguedad_empleo_titular': 'months_employed',
                  'ingresos_cliente_registrado_infonavit': 'client_income',
@@ -239,13 +247,19 @@ data_sub.loc[:, 'vendor_Y'] = clean_vendor(vendor=data_sub['vendor_name'])
 # Add ratios
 # ===========================================================================
 data_sub.loc[:, 'mar_2_inc'] = (data_sub['asset_market_value'] /
-                                    (data_sub['client_income'] * 10000))
+                                (data_sub['client_income'] * 10000))
 
 data_sub.loc[:, 'app_2_inc'] = (data_sub['appraisal_value'] /
-                                    (data_sub['client_income'] * 10000))
+                                (data_sub['client_income'] * 10000))
 
 data_sub.loc[:, 'mar_2_val'] = (data_sub['asset_market_value'] /
-                                   data_sub['asset_value'])
+                                data_sub['asset_value'])
+
+data_sub.loc[:, 'bank_2_home'] = (data_sub['bank_total'] /
+                                  data_sub['home_total'])
+
+data_sub.loc[:, 'mar_2_app'] = (data_sub['asset_market_value'] /
+                                data_sub['appraisal_value'])
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # ===========================================================================
@@ -263,32 +277,38 @@ ordered_columns = ['mortgage_id',
                    'asset_market_value',
                    'client_income',
                    'risk_index',
-                   'ratio',
                    'factor_employed',
                    'sex_F',
                    'condition_U',
                    'mar_2_inc',
                    'app_2_inc',
                    'mar_2_val',
+                   'bank_2_home',
+                   'mar_2_app',
+                   'ratio',
+                   'vendor_Y',
+                   'employed_30',
+                   'antiquity_20',
                    'inv_city',
                    'inv_state',
                    'inv_county',
                    'inv_zip',
-                   'vendor_Y',
-                   'employed_30',
-                   'antiquity_20',
+                   'credit_score',
                    'lender_score',
                    'y',
-                   'days_wo_pay',
-                   'effective_pay',
+                   'bank_total',
+                   'home_total',
+                   'bank_monthly',
+                   'home_monthly',
                    'days_pay',
+                   'effective_pay',
+                   'days_wo_pay',
                    'months_wo_pay',
                    'date_start',
                    'date_finish',
                    'last_date_pay',
                    'origin',
                    'new_used',
-                   'credit_score',
                    'appraisal_value',
                    'asset_age',
                    'labor_antiquity',
@@ -323,7 +343,7 @@ data_sub.to_csv(file_path, sep='|', index=False)
 # Sample a small amount of the data set
 # ===========================================================================
 n = data_sub.shape[0]
-per = 0.1
+per = 0.01
 m = round(n * per)
 np.random.seed(seed=12372763)
 selected_rows = np.random.choice(a=n, size=m, replace=False)
@@ -333,5 +353,6 @@ data_sample = data_sub.iloc[selected_rows, :]
 # ===========================================================================
 # Output the random sample extract
 # ===========================================================================
-data_sample.to_csv(file_path_sample, sep='|', index=False)
+data_sample.to_csv(file_path_sample, index=False)
+# data_sample.to_csv(file_path_sample, sep='|', index=False)
 # ===========================================================================
