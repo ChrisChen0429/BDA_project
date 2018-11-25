@@ -76,6 +76,7 @@ f = partial(k_means_addition,
             selected_columns=selected_columns,
             seed=12342)
 
+# noinspection PyTypeChecker
 zz = pool.map(func=f, iterable=iterable)
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -96,6 +97,8 @@ df.to_csv(path_or_buf=file_output, sep='|', index=False)
 # ===========================================================================
 # Results from 1 pass
 # ===========================================================================
+# df.groupby(by='cluster_20').agg({'y': [np.mean, np.ma.count]})
+
 # Cluster default rates
 #                  y
 #                mean count

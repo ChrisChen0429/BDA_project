@@ -112,12 +112,12 @@ renaming_dict = {'Nombre': 'mortgage_product',
                  'relacion_pago': 'ratio',
                  'calificacion_infonavit': 'lender_score',
                  'nombre_vendedor': 'vendor_name',
-                 'valor_compra_venta': 'asset_value',
+                 'valor_compra_venta': 'asset_market_value',
                  'colonia_compra': 'county_asset',
                  'ciudad_compra': 'city_asset',
                  'codigo_postal_compra': 'zip_asset',
                  'entidad_federativa_compra': 'state_asset',
-                 'valor_avaluo': 'asset_market_value',
+                 'valor_avaluo': 'asset_value',
                  'nueva_usada': 'new_used',
                  'indice_riesgo': 'risk_index',
                  'tipo_credito': 'credit_type',
@@ -236,6 +236,19 @@ data_sub.loc[:, 'vendor_Y'] = clean_vendor(vendor=data_sub['vendor_name'])
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # ===========================================================================
+# Add ratios
+# ===========================================================================
+data_sub.loc[:, 'mar_2_inc'] = (data_sub['asset_market_value'] /
+                                    (data_sub['client_income'] * 10000))
+
+data_sub.loc[:, 'app_2_inc'] = (data_sub['appraisal_value'] /
+                                    (data_sub['client_income'] * 10000))
+
+data_sub.loc[:, 'mar_2_val'] = (data_sub['asset_market_value'] /
+                                   data_sub['asset_value'])
+# ===========================================================================
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# ===========================================================================
 # Order columns
 # ===========================================================================
 ordered_columns = ['mortgage_id',
@@ -254,6 +267,9 @@ ordered_columns = ['mortgage_id',
                    'factor_employed',
                    'sex_F',
                    'condition_U',
+                   'mar_2_inc',
+                   'app_2_inc',
+                   'mar_2_val',
                    'inv_city',
                    'inv_state',
                    'inv_county',
