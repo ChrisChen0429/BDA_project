@@ -1,0 +1,155 @@
+---
+title: 'BDA Project: Analizing Default'
+author: "Andres Potapczynski (ap3635), Jongwoo Choi (jc4816), Yi Chen (yc3356)"
+date: "12/10/2018"
+output: pdf_document
+---
+
+```{r, include=FALSE}
+## 
+```
+
+```{r Imports, message=FALSE, warning=FALSE}
+library(rstan)
+library(tidyverse)
+library(arm)
+library(ggplot2)
+library(gridExtra)
+library(bayesplot)
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Files, message=FALSE, warning=FALSE}
+file <-  '../DBs/core.txt'
+file_model_logistic <- '../Analysis/log_reg_v02.stan'
+file_model_base <- '../Analysis/binomial_spatial_base.stan'
+file_model_binomial <- '../Analysis/binomial_spatial_01.stan'
+file_model_binomial_ext <- '../Analysis/binomial_spatial_02.stan'
+```
+
+# Abstract
+
+# Setting the preamble
+
+# Data
+
+```{r Load the data, message=FALSE, warning=FALSE}
+data <- read_delim(file = file, delim = '|')
+
+# Sample the data
+pct = 1
+# pct = 0.1
+# pct = 0.01
+set.seed(seed = 42)
+sample_size = round(pct * nrow(data))
+sample <- sample(x = nrow(data), size = sample_size, replace = F)
+data = data[sample, ]
+
+## Selecting the relevant columns for the analysis
+data_sub <- data %>% dplyr::select(
+  state,
+  city,
+  county,
+  zip,
+  asset_market_value,
+  mar_2_app,
+  appraisal_value,
+  app_2_inc,
+  client_income,
+  mar_2_inc,
+  age,
+  sex_F,
+  condition_U,
+  y)
+summary(data_sub)
+
+geo <- data_sub %>% 
+  group_by(state) %>% 
+  summarize(market_mean = mean(asset_market_value),
+            appraisal_mean = mean(appraisal_value),
+            income_mean = mean(client_income),
+            mar_2_inc_mean = mean(mar_2_inc),
+            app_2_inc_mean = mean(app_2_inc),
+            mar_2_app_mean = mean(mar_2_app),
+            age_mean = mean(age),
+            y_sum = sum(y),
+            state_n = n()) %>% 
+  ungroup()
+```
+
+```{r Prep data for STAN model}
+## Rescaling
+inputs <- geo %>%
+  mutate(
+    income_st = (income_mean - mean(income_mean)) / sd(income_mean),
+    appraisal_st = (appraisal_mean - mean(appraisal_mean)) / sd(appraisal_mean),
+    market_st = (market_mean - mean(market_mean)) / sd(market_mean),
+    mar_2_inc_st = (mar_2_inc_mean - mean(mar_2_inc_mean)) / sd(mar_2_inc_mean),
+    app_2_inc_st = (app_2_inc_mean - mean(app_2_inc_mean)) / sd(app_2_inc_mean),
+    mar_2_app_st = (mar_2_app_mean - mean(mar_2_app_mean)) / sd(mar_2_app_mean),
+    age_st = (age_mean - mean(age_mean)) / sd(age_mean)
+         ) %>% 
+  dplyr::select(
+    income_st,
+    mar_2_inc_st,
+    appraisal_st,
+    app_2_inc_st,
+    mar_2_app_st,
+    market_st,
+    age_st,
+    state_n,
+    y_sum
+  )
+
+## Inputs for STAN
+y = inputs$y_sum
+Ns = inputs$state_n
+X = inputs %>% dplyr::select(-y_sum, -state_n)
+N = nrow(X)
+D = ncol(X)
+
+data_stan_noX = list(N=N, Ns=Ns, y=y)
+data_stan = list(N=N, D=D, X=X, Ns=Ns, y=y)
+```
+
+## Covariates
+
+[...] Put the list of covariates in the 
+
+## Exploratory Data Analysis
+
+[...] Show general relationships in the data
+
+## Data Preprocessing
+
+[...] Add standarization procedures
+
+# Baseline Model
+
+## Specification
+
+## Results
+
+## Evaluation
+
+# Model Extension 1
+
+## Specification
+
+## Results
+
+## Evaluation
+
+# Model Extension 2
+
+## Specification
+
+## Results
+
+## Evaluation
+
+# Conclusion
+
+# Stan Code
