@@ -214,17 +214,17 @@ print(fit,pars=c('beta','lp__'))
 
 ```{r}
 ## CAR model
-CAR_data <- list(n = n,         # number of observations
-               s = 32,
-               p = p,         # number of coefficients
+CAR_data <- list(k = nrow(X),         # number of observations
+               n = nrow(A),
+               p = ncol(X),         # number of coefficients
                X = X,               # design matrix
                y = y,               # observed number of cases
                W = A,
                W_n = sum(A) / 2,    # number of neighbor pairs
                state = state)               # adjacency matrix
 CAR_model = model <- stan_model('./yi_stan/yi_CAR_city.stan')
-fit <- sampling(CAR_model, data = CAR_data,chains = 1)
-print(fit,pars=c('beta','phi','lp__'))
+fit <- sampling(CAR_model, data = CAR_data)
+print(fit,pars=c('phi','lp__'))
 ```
 2. PPCs
 
@@ -243,7 +243,7 @@ Hier_data <- list(n = n,         # number of observations
                state = state)               # adjacency matrix
 Hier_model = model <- stan_model('./yi_stan/yi_hier_city.stan')
 fit <- sampling(Hier_model, data = Hier_data)
-print(fit,pars=c('beta','alpha','alpha_s','lp__'))
+print(fit,pars=c('alpha','alpha_s','lp__'))
 ```
 2. PPCs
 
