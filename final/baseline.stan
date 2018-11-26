@@ -73,7 +73,7 @@ model {
 generated quantities{
   int<lower =0> y_rep[k];
   for (i in 1:k){
-    y_rep[i] = bernoulli_logit_rng(X[i,] * beta +  + phi[state[i]]);
+    y_rep[i] = bernoulli_logit_rng(X[i,] * beta + phi[state[i]]);
   }
 }
 
