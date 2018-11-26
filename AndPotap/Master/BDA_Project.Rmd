@@ -1,0 +1,241 @@
+---
+title: 'BDA Project: Analizing Default'
+author: "Andres Potapczynski (ap3635), Jongwoo Choi (), Yi ()"
+date: "12/10/2018"
+output: pdf_document
+---
+
+```{r, include=FALSE}
+## 
+```
+
+```{r Imports, include=FALSE}
+library(rstan)
+library(tidyverse)
+library(arm)
+library(ggplot2)
+library(gridExtra)
+library(bayesplot)
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Files, include=FALSE}
+file <-  '../DBs/core.txt'
+file_model_logistic <- '../Analysis/log_reg_v02.stan'
+```
+
+The current document is ordered in the following manner. First, I set the context of the problem by describing the data set and some key features about it. Here I also re-state the questions that we (start-up and I) want to answer. Next I show some preliminary models that I ran in order to make sense of the data. The idea is to find the set variables that we should include in the final model and to understand at what level of granularity are those variables meaningful. Then I show a proposal of a graphical model that I then plan to estimate via VI. Finally, I conclude with a pipeline of models that I will be running in the following month as well as some questions where I would like to get some feedback on.
+
+# Setting the preamble
+
+```{r Load the data, include=FALSE}
+data <- read_delim(file = file, delim = '|')
+
+# Sample the data
+pct = 1
+# pct = 0.1
+# pct = 0.01
+set.seed(seed = 42)
+sample_size = round(pct * nrow(data))
+sample <- sample(x = nrow(data), size = sample_size, replace = F)
+data = data[sample, ]
+
+## Selecting the relevant columns for the analysis
+data_sub <- data %>% dplyr::select(
+  asset_market_value,
+  mar_2_app,
+  appraisal_value,
+  app_2_inc,
+  client_income,
+  mar_2_inc,
+  age,
+  sex_F,
+  condition_U,
+  y)
+summary(data_sub)
+
+## Making inputs
+y = data_sub$y
+```
+
+```{r Preping the data for the first model}
+## Rescaling
+inputs <- data_sub %>%
+  dplyr::select(-y) %>% 
+  mutate(log_income = log(client_income),
+         log_appraisal = log(appraisal_value),
+         log_market = log(asset_market_value),
+         income_st = (log_income - mean(log_income)) / sd(log_income),
+         appraisal_st = (log_appraisal - mean(log_appraisal)) / sd(log_appraisal),
+         market_st = (log_market - mean(log_market)) / sd(log_market),
+         age_st = (age - mean(age)) / sd(age)
+         ) %>% 
+  dplyr::select(
+    market_st,
+    mar_2_app,
+    appraisal_st,
+    app_2_inc,
+    income_st,
+    mar_2_inc,
+    age_st,
+    sex_F,
+    condition_U
+  )
+
+#### Train / Test split
+set.seed(seed = 81989843)
+pct_train = 0.9
+sample_size = round(pct_train * nrow(inputs))
+sample <- sample(x = nrow(inputs), size = sample_size, replace = F)
+
+## Allocate train
+inputs_train = inputs[sample, ]
+y_train = y[sample]
+
+## Allocate test
+inputs_test = inputs[-sample, ]
+y_test = y[-sample]
+
+## Create inputs for STAN
+data_stan_train <- list(N=nrow(inputs_train), 
+                        D=ncol(inputs_train), 
+                        X=inputs_train, 
+                        y=y_train)
+```
+
+
+```{r Run first STAN model, include=FALSE}
+sm <- stan_model(file_model_logistic)
+sm.logistic_v01 = sampling(sm, data=data_stan_train, iter=1000, chains=4)
+```
+
+```{r Print resutls of logistic regression, echo=FALSE}
+print(sm.logistic_v01, 
+      digits = 2, 
+      probs = c(0.025, 0.5, 0.975))
+```
+
+```{r Extract to evaluate}
+sims <- rstan::extract(sm.logistic_v01)
+beta_median <- apply(X = sims$beta, MARGIN = 2, FUN = median)
+alpha_median <- median(sims$alpha)
+```
+
+```{r Compute test accuracy}
+threshold = 0.12
+
+y_hat_baseline <- rep(0, times = length(y_test))
+
+accuracy_base = sum(y_hat_baseline == y_test) / length(y_test)
+
+cat('\nBaseline accuracy: ', accuracy_base * 100)
+
+proba_hat <- invlogit(as.matrix(inputs_test) %*% beta_median + alpha_median)
+proba_hat <- as.numeric(proba_hat)
+
+y_hat = rep(0, times = length(y_test))
+y_hat[proba_hat > threshold] = 1
+
+accuracy = sum(y_hat == y_test) / length(y_test)
+
+cat('\nLogistic accuracy: ', accuracy * 100)
+cat('\nConfusion table\n')
+print(table(y_test, y_hat))
+```
+
+```{r Preping the data for the second model}
+income_threshold = 400
+## Rescaling
+inputs_02 <- data_sub %>% 
+  # filter(client_income > income_threshold) %>% 
+  filter(client_income <= income_threshold) %>% 
+  dplyr::select(-y) %>% 
+  mutate(log_income = log(client_income),
+         log_appraisal = log(appraisal_value),
+         log_market = log(asset_market_value),
+         income_st = (log_income - mean(log_income)) / sd(log_income),
+         appraisal_st = (log_appraisal - mean(log_appraisal)) / sd(log_appraisal),
+         market_st = (log_market - mean(log_market)) / sd(log_market),
+         age_st = (age - mean(age)) / sd(age)
+         ) %>% 
+  # dplyr::select(
+  #   market_st,
+  #   mar_2_app,
+  #   appraisal_st,
+  #   app_2_inc,
+  #   income_st,
+  #   mar_2_inc,
+  #   age_st,
+  #   sex_F,
+  #   condition_U
+  # )
+  dplyr::select(
+      market_st,
+      sex_F
+    )
+
+# y_02 <- data_sub[data_sub$client_income > income_threshold, ]$y
+y_02 <- data_sub[data_sub$client_income <= income_threshold, ]$y
+
+#### Train / Test split
+set.seed(seed = 81989843)
+pct_train = 0.9
+sample_size = round(pct_train * nrow(inputs_02))
+sample <- sample(x = nrow(inputs_02), size = sample_size, replace = F)
+
+## Allocate train
+inputs_train_02 = inputs_02[sample, ]
+y_train_02 = y_02[sample]
+
+## Allocate test
+inputs_test_02 = inputs_02[-sample, ]
+y_test_02 = y_02[-sample]
+
+## Create inputs for STAN
+data_stan_train <- list(N=nrow(inputs_train_02), 
+                        D=ncol(inputs_train_02), 
+                        X=inputs_train_02, 
+                        y=y_train_02)
+```
+
+```{r Run first STAN model, include=FALSE}
+sm.logistic_v02 = sampling(sm, data=data_stan_train, iter=1000, chains=4)
+```
+
+```{r Print resutls of logistic regression, echo=FALSE}
+print(sm.logistic_v02, 
+      digits = 2, 
+      probs = c(0.025, 0.5, 0.975))
+```
+
+```{r Extract to evaluate}
+sims_02 <- rstan::extract(sm.logistic_v02)
+beta_median_02 <- apply(X = sims_02$beta, MARGIN = 2, FUN = median)
+alpha_median_02 <- median(sims_02$alpha)
+```
+
+```{r Compute test accuracy}
+threshold_02 = 0.08
+
+y_hat_baseline_02 <- rep(0, times = length(y_test_02))
+
+accuracy_base = sum(y_hat_baseline_02 == y_test_02) / length(y_test_02)
+
+cat('\nBaseline accuracy: ', accuracy_base * 100)
+
+proba_hat_02 <- invlogit(as.matrix(inputs_test_02) %*% beta_median_02 + alpha_median_02)
+proba_hat_02 <- as.numeric(proba_hat_02)
+
+y_hat_02 = rep(0, times = length(y_test_02))
+y_hat_02[proba_hat_02 > threshold_02] = 1
+
+accuracy_02 = sum(y_hat_02 == y_test_02) / length(y_test_02)
+
+cat('\nLogistic accuracy: ', accuracy_02 * 100)
+cat('\nConfusion table\n')
+print(table(y_test_02, y_hat_02))
+```
+
+asdf
