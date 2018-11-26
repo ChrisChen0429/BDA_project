@@ -18,13 +18,13 @@ functions {
 }
 data {
   int<lower = 1> n;                     // number of state
-  int<lower = 1> c;                     // number of county
+  int<lower = 1> c;                     // number of city
   int<lower = 1> k;                     // number of record
   int<lower = 1> p;                     // number of non-geo parameter
   matrix[k, p] X;                       // raw data matrix
   int<lower = 0> y[k];                  // response
   int<lower=1> state[k];                // state indicator
-  int<lower=1> county[k];                // county indicator
+  int<lower=1> city[k];                // city indicator
   matrix<lower = 0, upper = 1>[n, n] W; // adjacency matrix
   int W_n;                              // number of adjacent region pairs
   
@@ -71,12 +71,12 @@ model {
   phi_unscaled ~ sparse_iar(tau, W_sparse, D_sparse, lambda, n, W_n);
   beta ~ cauchy(0, 1);
   tau ~ gamma(2, 2);
-  theta[county] ~ cauchy(phi[state],1);
-  y ~ bernoulli_logit(X * beta + theta[county]);
+  theta[city] ~ cauchy(phi[state],1);
+  y ~ bernoulli_logit(X * beta + theta[city]);
 }
 generated quantities{
   int<lower =0> y_rep[k];
   for (i in 1:k){
-    y_rep[i] = bernoulli_logit_rng(X[i,] * beta + theta[county[i]]);
+    y_rep[i] = bernoulli_logit_rng(X[i,] * beta + theta[city[i]]);
   }
 }

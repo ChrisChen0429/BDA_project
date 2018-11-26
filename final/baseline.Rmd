@@ -106,8 +106,6 @@ X <- cbind(data$client_income,
 colnames(X) <- c('client_income', 'age','asset market value','factor_employed employed')
 scaled_x <- scale(X)
 y = as.numeric(data$y)
-y[y==1] = 0
-y[y==2] = 1
 state = as.vector(data$state)
 unique_s = unique(state)
 for (i in 1:32){
@@ -128,12 +126,14 @@ data_list <- list(k = nrow(X),         # number of observations
                W_n = sum(A) / 2,    # number of neighbor pairs
                state = state)               # adjacency matrix
 fit <- sampling(model, data = data_list)
-print(fit, pars = c('beta','phi'.'lp_'))
+print(fit, pars = c('beta','phi','lp__'))
 ```
 
 ```{r}
 library(bayesplot)
 library(shinystan)
+ss_mod = as.shinystan(fit)
+launch_shinystan(ss_mod)
 
 select_vec <- which(data$state %in% unique(data$state)[5:10])
 ppc_stat_grouped(y = data$y[select_vec], 
