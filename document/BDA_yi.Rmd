@@ -7,10 +7,6 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r, include=FALSE}
-## 
-```
-
 ```{r Imports, message=FALSE, warning=FALSE}
 library(rstan)
 library(tidyverse)
@@ -18,13 +14,10 @@ library(arm)
 library(ggplot2)
 library(gridExtra)
 library(bayesplot)
+library(shinystan)
 options(mc.cores = parallel::detectCores())
 rstan_options(auto_write = TRUE)
 knitr::opts_chunk$set(echo = TRUE)
-```
-
-```{r Files, message=FALSE, warning=FALSE}
-file <-  '../data/core.txt'
 ```
 
 # Abstract
@@ -34,6 +27,7 @@ file <-  '../data/core.txt'
 # Data
 
 ```{r Load the data, message=FALSE, warning=FALSE}
+file <-  '../data/core.txt'
 data <- read_delim(file = file, delim = '|')
 
 # Sample the data
@@ -203,6 +197,9 @@ baseline_data = list(N=n,p=p, X=X,y=y)
 baseline_model = model <- stan_model('./yi_stan/yi_baseline_city.stan')
 fit <- sampling(baseline_model, data = baseline_data)
 print(fit,pars=c('beta','lp__'))
+ss_mod = as.shinystan(fit)
+launch_shinystan(ss_mod)
+
 ```
 
 
@@ -234,7 +231,7 @@ print(fit,pars=c('phi','lp__'))
 1. Modeling
 
 ```{r}
-## CAR model
+## Hier model
 Hier_data <- list(n = n,         # number of observations
                s = 32,
                p = p,         # number of coefficients
