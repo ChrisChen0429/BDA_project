@@ -25,7 +25,7 @@ data {
   int<lower=1> state[k];                // state indicator
   matrix<lower = 0, upper = 1>[n, n] W; // adjacency matrix
   int W_n;                              // number of adjacent region pairs
-  
+  int<lower=1> number[k];               // number of record for city k
 }
 transformed data {
   int W_sparse[W_n, 2];   // adjacency pairs
@@ -56,7 +56,8 @@ transformed data {
   }
 }
 parameters {
-  vector[p] beta;
+  matrix[n,p] beta;
+  //vector[p] beta;
   vector[n] phi_unscaled;
   real<lower = 0> tau;
 }
@@ -65,14 +66,18 @@ transformed parameters {
   phi = phi_unscaled - mean(phi_unscaled);
 }
 model {
-  phi_unscaled ~ sparse_iar(tau, W_sparse, D_sparse, lambda, n, W_n);
-  beta ~ cauchy(0, 1);
   tau ~ gamma(2, 2);
-  y ~ binomial_logit(n, X * beta + phi[state]);
+  phi_unscaled ~ sparse_iar(tau, W_sparse, D_sparse, lambda, n, W_n);
+  //beta ~ cauchy(0, 1);
+  for (i in 1:n){beta[i,] ~ normal(phi[i], 5);}
+  for (i in 1:k){
+    y[i] ~ binomial_logit(number[i], X[i,]*beta[state[i],]');
+    }
+  //y ~ binomial_logit(n, X * beta + phi[state]);
 }
 generated quantities{
   int<lower =0> y_rep[k];
   for (i in 1:k){
-    y_rep[i] = binomial_rng(n, inv_logit(X[i,] * beta + phi[state[i]]));
+    y_rep[i] = binomial_rng(number[i], inv_logit(X[i,]*beta[state[i],]'));
   }
 }
