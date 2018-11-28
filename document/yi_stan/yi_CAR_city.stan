@@ -15,6 +15,17 @@ functions {
       return 0.5 * ((n-1) * log(tau)
                     - tau * (phit_D * phi - (phit_W * phi)));
   }
+  
+     /*
+   * Alternative to poisson_log_rng() that 
+   * avoids potential numerical problems during warmup
+   */
+   int poisson_log_safe_rng(real eta) {
+     real pois_rate = exp(eta);
+     if (pois_rate >= exp(20.79))
+       return -9;
+     return poisson_rng(pois_rate);
+   }
 }
 data {
   int<lower = 1> n;                     // number of state
@@ -25,14 +36,14 @@ data {
   int<lower=1> state[k];                // state indicator
   matrix<lower = 0, upper = 1>[n, n] W; // adjacency matrix
   int W_n;                              // number of adjacent region pairs
+  int<lower=1> number[k];               // number of record for city k
   
 }
 transformed data {
   int W_sparse[W_n, 2];   // adjacency pairs
   vector[n] D_sparse;     // diagonal of D (number of neigbors for each site)
   vector[n] lambda;       // eigenvalues of invsqrtD * W * invsqrtD
-  
-  { // generate sparse representation for W
+   { // generate sparse representation for W
   int counter;
   counter = 1;
   // loop over upper triangular part of W to identify neighbor pairs
@@ -68,12 +79,12 @@ model {
   tau ~ gamma(2, 2);
   phi_unscaled ~ sparse_iar(tau, W_sparse, D_sparse, lambda, n, W_n);
   for (i in 1:n){beta[i,] ~ normal(phi[i], 5);}
-  for (i in 1:k){y[i] ~ poisson_log(X[i,] * beta[state[i],]');}
+  for (i in 1:k){y[i] ~ poisson_log(log(number[i]) + X[i,] * beta[state[i],]');}
 }
 generated quantities{
   int<lower =0> y_rep[k];
   for (i in 1:k){
-    y_rep[i] = poisson_log_rng(X[i,] * beta[state[i],]');
+    y_rep[i] = poisson_log_rng(log(number[i]) + X[i,] * beta[state[i],]');
   }
 }
 

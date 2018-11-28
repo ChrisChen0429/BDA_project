@@ -55,7 +55,6 @@ data_sub <- data %>% dplyr::select(
   sex_F,
   condition_U,
   y)
-summary(data_sub)
 
 geo <- data_sub %>% group_by(city) %>% 
   summarize(market_mean = mean(asset_market_value),
@@ -65,6 +64,7 @@ geo <- data_sub %>% group_by(city) %>%
             app_2_inc_mean = mean(app_2_inc),
             mar_2_app_mean = mean(mar_2_app),
             age_mean = mean(age),
+            number = n(),
             y_sum = sum(y)) %>% ungroup()
 state = c()
 for (i in geo$city){state = c(state, unique(data$state[which(data$city==i)])[1])}
@@ -92,6 +92,7 @@ inputs <- geo %>%
     market_st,
     age_st,
     state,
+    number,
     y_sum
   )
 ```
@@ -174,7 +175,8 @@ A[c('GUERRERO','PUEBLA','VERACRUZ LLAVE','CHIAPAS'),'OAXACA'] =1
 ```{r}
 ## Inputs for STAN
 y = inputs$y_sum
-X = inputs %>% dplyr::select(-y_sum, -state)
+number = inputs$number
+X = inputs %>% dplyr::select(-y_sum, -state,-number)
 X = cbind(1,X)
 colnames(X) <- c('intercept','income_st','mar_2_inc_st','appraisal_st','app_2_inc_st','mar_2_app_st','market_st','age_st')
 n = nrow(X)
@@ -193,12 +195,12 @@ state = as.numeric(state)
 1. Modeling
 ```{r warning=FALSE}
 ## baseline model
-baseline_data = list(N=n,p=p, X=X,y=y)
+baseline_data = list(N=n,p=p, number = inputs$number,X=X,y=y)
 baseline_model = model <- stan_model('./yi_stan/yi_baseline_city.stan')
-fit <- sampling(baseline_model, data = baseline_data)
+fit <- sampling(baseline_model, data = baseline_data,show_messages = FALSE,seed=1234)
 print(fit,pars=c('beta','lp__'))
-ss_mod = as.shinystan(fit)
-launch_shinystan(ss_mod)
+#ss_mod = as.shinystan(fit)
+#launch_shinystan(ss_mod)
 
 ```
 
@@ -217,11 +219,14 @@ CAR_data <- list(k = nrow(X),         # number of observations
                X = X,               # design matrix
                y = y,               # observed number of cases
                W = A,
+               number = inputs$number,
                W_n = sum(A) / 2,    # number of neighbor pairs
                state = state)               # adjacency matrix
 CAR_model = model <- stan_model('./yi_stan/yi_CAR_city.stan')
-fit <- sampling(CAR_model, data = CAR_data)
-print(fit,pars=c('phi','lp__'))
+fit_car <- sampling(CAR_model, data = CAR_data,show_messages = FALSE,seed=1234)
+print(fit_car,pars=c('phi','lp__'))
+#ss_mod_car = as.shinystan(fit_car)
+#launch_shinystan(ss_mod_car)
 ```
 2. PPCs
 
@@ -237,13 +242,35 @@ Hier_data <- list(n = n,         # number of observations
                p = p,         # number of coefficients
                X = X,               # design matrix
                y = y,               # observed number of cases
+               number = inputs$number,
                state = state)               # adjacency matrix
 Hier_model = model <- stan_model('./yi_stan/yi_hier_city.stan')
-fit <- sampling(Hier_model, data = Hier_data)
+fit <- sampling(Hier_model, data = Hier_data,show_messages = FALSE,seed=1234)
 print(fit,pars=c('alpha','alpha_s','lp__'))
+#ss_mod = as.shinystan(fit)
+#launch_shinystan(ss_mod)
 ```
 2. PPCs
 
+### extension: zero inflated possion binomial-mixture model
+
+```{r}
+## zero inflated model
+zero_data <- list(k = nrow(X),         # number of observations
+               n = nrow(A),
+               p = ncol(X),         # number of coefficients
+               X = X,               # design matrix
+               y = y,               # observed number of cases
+               W = A,
+               number = inputs$number,
+               W_n = sum(A) / 2,    # number of neighbor pairs
+               state = state)               # adjacency matrix
+zero_model = model <- stan_model('./yi_stan/zero-inflated-possion-binormal-mix.stan')
+fit_zero <- sampling(zero_model, data = zero_data,show_messages = FALSE,seed=1234)
+print(fit_zero,pars=c('phi','lp__'))
+ss_mod_zero = as.shinystan(fit_zero)
+launch_shinystan(ss_mod_zero)
+```
 
 
 
