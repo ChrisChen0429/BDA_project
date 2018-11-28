@@ -71,6 +71,7 @@ geo <- data_sub %>% group_by(city) %>%
             app_2_inc_mean = mean(app_2_inc),
             mar_2_app_mean = mean(mar_2_app),
             age_mean = mean(age),
+            number = n(),
             y_sum = sum(y)) %>% ungroup()
 state = c()
 for (i in geo$city){state = c(state, unique(data$state[which(data$city==i)])[1])}
@@ -98,6 +99,7 @@ inputs <- geo %>%
     market_st,
     age_st,
     state,
+    number,
     y_sum
   )
 ```
@@ -193,16 +195,18 @@ for (i in 1:32){
 state = as.numeric(state)
 ```
 
+
 ### Baseline model
 
 1. Modeling
 ```{r warning=FALSE}
 ## baseline model
-baseline_data = list(N=n,p=p,X=X,y=y)
-baseline_model = stan_model('./models/binomial_baseline_city.stan')
+baseline_data = list(N=n,p=p, number = inputs$number, X=X,y=y)
+baseline_model = stan_model('./binomial_stan/binomial_baseline_city.stan')
 fit1 <- sampling(baseline_model, data=baseline_data)
-print(fit1, pars=c('alpha','beta','lp__'))
+print(fit1, pars=c('beta','lp__'))
 ```
+
 
 2. PPCs
 ```{r}
@@ -223,9 +227,10 @@ CAR_data <- list(k = nrow(X),         # number of observations
                X = X,               # design matrix
                y = y,               # observed number of cases
                W = A,
+               number = inputs$number,
                W_n = sum(A) / 2,    # number of neighbor pairs
                state = state)               # adjacency matrix
-CAR_model = stan_model('./models/binomial_CAR_city.stan')
+CAR_model = stan_model('./binomial_stan/binomial_CAR_city.stan')
 fit2 <- sampling(CAR_model, data = CAR_data)
 print(fit2, pars=c('phi','lp__'))
 ```
@@ -243,13 +248,14 @@ launch_shinystan(ss_mod2)
 
 ```{r}
 ## Hier model
-Hier_data <- list(n = n,         # number of observations
-               s = 32,
-               p = p,         # number of coefficients
-               X = X,               # design matrix
-               y = y,               # observed number of cases
-               state = state)               # adjacency matrix
-Hier_model = stan_model('./models/binomial_hier_city.stan')
+Hier_data <- list(n = n,             # number of observations
+                  s = 32,
+                  p = p,             # number of coefficients
+                  X = X,             # design matrix
+                  y = y,             # observed number of cases
+                  number = inputs$number,
+                  state = state)     # adjacency matrix
+Hier_model = stan_model('./binomial_stan/binomial_hier_city.stan')
 fit3 <- sampling(Hier_model, data = Hier_data)
 print(fit3, pars=c('alpha','alpha_s','lp__'))
 ```
@@ -257,7 +263,7 @@ print(fit3, pars=c('alpha','alpha_s','lp__'))
 2. PPCs
 
 ```{r}
-ss_mod3 = as.shinystan(fit2)
+ss_mod3 = as.shinystan(fit3)
 launch_shinystan(ss_mod3)
 ```
 
