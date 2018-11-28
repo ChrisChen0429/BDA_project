@@ -199,8 +199,8 @@ baseline_data = list(N=n,p=p, number = inputs$number,X=X,y=y)
 baseline_model = model <- stan_model('./yi_stan/yi_baseline_city.stan')
 fit <- sampling(baseline_model, data = baseline_data,show_messages = FALSE,seed=1234)
 print(fit,pars=c('beta','lp__'))
-#ss_mod = as.shinystan(fit)
-#launch_shinystan(ss_mod)
+ss_mod = as.shinystan(fit)
+launch_shinystan(ss_mod)
 
 ```
 
@@ -225,8 +225,8 @@ CAR_data <- list(k = nrow(X),         # number of observations
 CAR_model = model <- stan_model('./yi_stan/yi_CAR_city.stan')
 fit_car <- sampling(CAR_model, data = CAR_data,show_messages = FALSE,seed=1234)
 print(fit_car,pars=c('phi','lp__'))
-#ss_mod_car = as.shinystan(fit_car)
-#launch_shinystan(ss_mod_car)
+ss_mod_car = as.shinystan(fit_car)
+launch_shinystan(ss_mod_car)
 ```
 2. PPCs
 
@@ -245,10 +245,10 @@ Hier_data <- list(n = n,         # number of observations
                number = inputs$number,
                state = state)               # adjacency matrix
 Hier_model = model <- stan_model('./yi_stan/yi_hier_city.stan')
-fit <- sampling(Hier_model, data = Hier_data,show_messages = FALSE,seed=1234)
-print(fit,pars=c('alpha','alpha_s','lp__'))
-#ss_mod = as.shinystan(fit)
-#launch_shinystan(ss_mod)
+Hier_fit <- sampling(Hier_model, data = Hier_data,show_messages = FALSE,seed=1234)
+print(Hier_fit,pars=c('alpha','alpha_s','lp__'))
+Hier_ss_mod = as.shinystan(Hier_fit)
+launch_shinystan(Hier_ss_mod)
 ```
 2. PPCs
 
@@ -265,7 +265,7 @@ zero_data <- list(k = nrow(X),         # number of observations
                number = inputs$number,
                W_n = sum(A) / 2,    # number of neighbor pairs
                state = state)               # adjacency matrix
-zero_model = model <- stan_model('./yi_stan/zero-inflated-possion-binormal-mix.stan')
+zero_model <- stan_model('./yi_stan/zero-inflated-possion-binormal-mix.stan')
 fit_zero <- sampling(zero_model, data = zero_data,show_messages = FALSE,seed=1234)
 print(fit_zero,pars=c('phi','lp__'))
 ss_mod_zero = as.shinystan(fit_zero)

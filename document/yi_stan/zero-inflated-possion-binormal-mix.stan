@@ -89,12 +89,12 @@ model {
   }
 }
 generated quantities{
-  int<lower =0> y_rep[k];
+  int y_rep[k];
   real<lower =0,upper=1> zero[k];
   for (i in 1:k){
     zero[i] = uniform_rng(0,1);
     if (zero[i] < theta){y_rep[i] = 0;}
-    else{y_rep[i] = poisson_log_rng(log(number[i]) +X[i,] * beta[state[i],]');}
+    else{y_rep[i] = poisson_log_safe_rng(log(number[i]) +X[i,] * beta[state[i],]');}
   }
 }
 
