@@ -130,6 +130,8 @@ data_stan = list(N=N, D=D, X=X, Ns=Ns, y=y)
 
 ## Specification
 
+## Parameter Recovery
+
 ## Results
 
 ## Evaluation
@@ -138,6 +140,8 @@ data_stan = list(N=N, D=D, X=X, Ns=Ns, y=y)
 
 ## Specification
 
+## Parameter Recovery
+
 ## Results
 
 ## Evaluation
@@ -145,6 +149,8 @@ data_stan = list(N=N, D=D, X=X, Ns=Ns, y=y)
 # Model Extension 2
 
 ## Specification
+
+## Parameter Recovery
 
 ## Results
 
