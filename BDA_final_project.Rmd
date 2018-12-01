@@ -188,12 +188,38 @@ baseline_data = list(N_train=N_train, N_test=N_test, D=D,
 ```{r results='hide', warning=FALSE, message=FALSE}
 baseline_model = stan_model('./binomial_stan/binomial_baseline_city.stan')
 fit1 <- sampling(baseline_model, data=baseline_data)
-print(fit1, pars=c('alpha', 'beta', 'lp__'))
+print(fit1, pars=c('a', 'beta', 'lp__'))
 ```
 
 
 ```{r}
+sims <- rstan::extract(fit1)
+# a_median <- median(sims$a)
+# beta_median <- apply(X = sims$beta, MARGIN = 2, FUN = median)
+# 
+# y_hat <- N_test * invlogit(a_median + as.matrix(X_test)%*%beta_median)
 
+# mode <- function(x) {
+#   ux <- unique(x)
+#   ux[which.max(tabulate(match(x, ux)))]
+# }
+
+y_hat <- apply(X = sims$y_rep_cv, MARGIN = 2, FUN = median)  
+
+test_df = data.frame(ID_state = inputs_test$ID_state,
+                     y_test = y_test,
+                     y_hat = y_hat)
+
+test_df <- test_df %>% 
+  summarize(y_sum_test = sum(y_test),
+            y_sum_hat = sum(y_hat)) %>% 
+  arrange(desc(y_sum_test)) %>% 
+  ungroup()
+
+accuracy_baseline = mean(abs(test_df$y_sum_test) ** 2)
+accuracy = mean(abs(test_df$y_sum_hat - test_df$y_sum_test) ** 2)
+cat('\nBaseline MSE: ', accuracy_baseline * 100)
+cat('\nLogistic MSE: ', accuracy * 100)
 ```
 
 
