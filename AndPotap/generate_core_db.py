@@ -107,13 +107,18 @@ renaming_dict = {'Nombre': 'mortgage_product',
                  'numero_credito': 'mortgage_id',
                  'fecha_firma_credito': 'date_signed',
                  'factor_pago_roa': 'factor_employed',
-                 'importe_original_credito_porcion_banco_pesos': 'bank_total',
-                 'importe_original_credito_porcion_infonavit_pesos': 'home_total',
-                 'importe_original_porcion_banco_vsm': 'bank_monthly',
-                 'importe_original_porcion_infonavit_vsm': 'home_monthly',
+                 'importe_original_credito_porcion_banco_pesos':
+                     'bank_total',
+                 'importe_original_credito_porcion_infonavit_pesos':
+                     'home_total',
+                 'importe_original_porcion_banco_vsm':
+                     'bank_monthly',
+                 'importe_original_porcion_infonavit_vsm':
+                     'home_monthly',
                  'tasa_interes': 'interest_rate',
                  'antiguedad_empleo_titular': 'months_employed',
-                 'ingresos_cliente_registrado_infonavit': 'client_income',
+                 'ingresos_cliente_registrado_infonavit':
+                     'client_income',
                  'relacion_pago': 'ratio',
                  'calificacion_infonavit': 'lender_score',
                  'nombre_vendedor': 'vendor_name',
@@ -130,7 +135,8 @@ renaming_dict = {'Nombre': 'mortgage_product',
                  'nombre_empresa': 'employer_name',
                  'edad': 'age',
                  'calificacion_buro': 'credit_score',
-                 'Monto_credito_original_total_pesos': 'appraisal_value'}
+                 'Monto_credito_original_total_pesos':
+                     'appraisal_value'}
 # Rename the data set
 data_sub = data_sub.rename(columns=renaming_dict)
 
@@ -277,6 +283,8 @@ ordered_columns = ['mortgage_id',
                    'sex_F',
                    'condition_U',
                    'y',
+                   'y2',
+                   'y3',
                    'risk_index',
                    'effective_pay',
                    'factor_employed',
