@@ -111,8 +111,10 @@ renaming_dict = {'numcred': 'mortgage_id',
 data = data.rename(columns=renaming_dict)
 data['y'] = 0
 data['y2'] = 0
+data['y3'] = 0
 data.loc[data['months_wo_pay'] >= 1, 'y'] = 1
 data.loc[data['months_wo_pay'] >= 2, 'y2'] = 1
+data.loc[data['months_wo_pay'] >= 2, 'y3'] = 1
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Transform into proper formats: DateTime and Integer
