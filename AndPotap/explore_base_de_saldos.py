@@ -29,7 +29,7 @@ file_it = './AndPotap/DBs/' \
           'BASE DE SALDOS FHIPO IT PESOS AGOSTO-18.xlsx.txt'
 file_s = './AndPotap/DBs/' \
          'BASE DE SALDOS FHIPO SOCIAL PESOS_AGOSTO-18.xlsx.txt'
-file_path = './AndPotap/DBS/core_y.txt'
+file_output = './AndPotap/DBS/core_y.txt'
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Open DBs
@@ -110,7 +110,9 @@ renaming_dict = {'numcred': 'mortgage_id',
                  'f_ult_pago': 'last_date_pay'}
 data = data.rename(columns=renaming_dict)
 data['y'] = 0
+data['y2'] = 0
 data.loc[data['months_wo_pay'] >= 1, 'y'] = 1
+data.loc[data['months_wo_pay'] >= 2, 'y2'] = 1
 # ===========================================================================
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Transform into proper formats: DateTime and Integer
@@ -129,5 +131,5 @@ for col in date_cols:
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Output the file
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-data.to_csv(file_path, sep='|', index=False)
+data.to_csv(file_output, sep='|', index=False)
 # ===========================================================================
