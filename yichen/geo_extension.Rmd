@@ -1,0 +1,149 @@
+---
+title: "Geo_extension.Rmd"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+data <- read.csv('../data/core.txt',sep = '|')
+## the first 4 lines seems to be wrong, delete it
+#rand_y <- sample(c(0,1,2),size = length(data$y),prob = c(0.7,0.2,0.1),replace = T)
+#data$y <- rand_y
+```
+
+
+Prepare for the space matrix
+```{r}
+N = length(unique(data$state))
+A <- matrix(0,ncol = N,nrow = N)
+colnames(A) = unique(data$state)
+rownames(A) = unique(data$state)
+A['NUEVO LEON',c('ZACATECAS','SAN LUIS POTOSI','TAMAULIPAS','COAHUILA DE ZARAGOZA')] = 1
+A[c('ZACATECAS','SAN LUIS POTOSI','TAMAULIPAS','COAHUILA DE ZARAGOZA'),'NUEVO LEON'] = 1
+A['VERACRUZ LLAVE',c('TAMAULIPAS','SAN LUIS POTOSI','HIDALGO','PUEBLA','OAXACA','CHIAPAS','TABASCO')] = 1
+A[c('TAMAULIPAS','SAN LUIS POTOSI','HIDALGO','PUEBLA','OAXACA','CHIAPAS','TABASCO'),'VERACRUZ LLAVE'] = 1
+A['GUANAJUATO',c('MICHOACAN DE OCAMPO','JALISCO','SAN LUIS POTOSI','ZACATECAS','QUERETARO DE ARTEAGA')] = 1
+A[c('MICHOACAN DE OCAMPO','JALISCO','SAN LUIS POTOSI','ZACATECAS','QUERETARO DE ARTEAGA'),'GUANAJUATO'] = 1
+A['NAYARIT',c('SINALOA','DURANGO','ZACATECAS','JALISCO')] = 1
+A[c('SINALOA','DURANGO','ZACATECAS','JALISCO'),'NAYARIT'] = 1
+A['JALISCO',c('NAYARIT','ZACATECAS','COLIMA','MICHOACAN DE OCAMPO','GUANAJUATO','AGUASCALIENTES')] = 1
+A[c('NAYARIT','ZACATECAS','COLIMA','MICHOACAN DE OCAMPO','GUANAJUATO','AGUASCALIENTES'),'JALISCO'] = 1
+A['DISTRITO FEDERAL',c('ESTADO DE MEXICO','MORELOS')] = 1
+A[c('ESTADO DE MEXICO','MORELOS'),'DISTRITO FEDERAL'] = 1
+A['MORELOS',c('GUERRERO','PUEBLA','ESTADO DE MEXICO')] = 1
+A[c('GUERRERO','PUEBLA','ESTADO DE MEXICO'),'MORELOS'] = 1
+A['MICHOACAN DE OCAMPO',c('COAHUILA DE ZARAGOZA','ESTADO DE MEXICO','JALISCO','GUANAJUATO','GUERRERO','QUERETARO DE ARTEAGA')] = 1
+A[c('COAHUILA DE ZARAGOZA','JALISCO','ESTADO DE MEXICO','GUANAJUATO','GUERRERO','QUERETARO DE ARTEAGA'),'MICHOACAN DE OCAMPO'] = 1
+A['ESTADO DE MEXICO',c('HIDALGO','QUERETARO DE ARTEAGA','MICHOACAN DE OCAMPO','GUERRERO','PUEBLA','TLAXCALA','MORELOS')] = 1
+A[c('HIDALGO','QUERETARO DE ARTEAGA','MICHOACAN DE OCAMPO','GUERRERO','PUEBLA','TLAXCALA','MORELOS'), 'ESTADO DE MEXICO'] = 1
+A['HIDALGO',c('ESTADO DE MEXICO','QUERETARO DE ARTEAGA','SAN LUIS POTOSI','VERACRUZ LLAVE','PUEBLA','TLAXCALA')] = 1
+A[c('ESTADO DE MEXICO','QUERETARO DE ARTEAGA','SAN LUIS POTOSI','VERACRUZ LLAVE','PUEBLA','TLAXCALA'),'HIDALGO'] = 1
+A['ZACATECAS',c('JALISCO','NAYARIT','DURANGO','COAHUILA DE ZARAGOZA','NUEVO LEON','TAMAULIPAS','SAN LUIS POTOSI','AGUASCALIENTES')] = 1
+A[c('JALISCO','NAYARIT','DURANGO','COAHUILA DE ZARAGOZA','NUEVO LEON','TAMAULIPAS','SAN LUIS POTOSI','AGUASCALIENTES'),'ZACATECAS'] = 1
+A['GUERRERO',c('MICHOACAN DE OCAMPO','PUEBLA','ESTADO DE MEXICO','MORELOS')] = 1
+A[c('MICHOACAN DE OCAMPO','PUEBLA','ESTADO DE MEXICO','MORELOS'),'GUERRERO'] = 1
+A['DURANGO',c('CHIHUAHUA','COAHUILA DE ZARAGOZA','ZACATECAS','NAYARIT','SINALOA')] = 1
+A[c('CHIHUAHUA','COAHUILA DE ZARAGOZA','ZACATECAS','NAYARIT','SINALOA'),'DURANGO'] = 1
+A['CHIHUAHUA',c('DURANGO','SINALOA','COAHUILA DE ZARAGOZA','SONORA')] = 1
+A[c('DURANGO','SINALOA','COAHUILA DE ZARAGOZA','SONORA'),'CHIHUAHUA'] = 1
+A['CHIAPAS',c('OAXACA','VERACRUZ LLAVE','TABASCO','CAMPECHE')] = 1
+A[c('OAXACA','VERACRUZ LLAVE','TABASCO','CAMPECHE'),'CHIAPAS'] = 1
+A['COLIMA',c('JALISCO','MICHOACAN DE OCAMPO')] = 1
+A[c('JALISCO','MICHOACAN DE OCAMPO'),'COLIMA'] = 1　
+A['COAHUILA DE ZARAGOZA',c('NUEVO LEON','ZACATECAS','DURANGO','CHIHUAHUA','SAN LUIS POTOSI')] = 1
+A[c('NUEVO LEON','ZACATECAS','DURANGO','CHIHUAHUA','SAN LUIS POTOSI'),'COAHUILA DE ZARAGOZA'] = 1
+A['SAN LUIS POTOSI',c('TABASCO','NUEVO LEON','COAHUILA DE ZARAGOZA','ZACATECAS','JALISCO','GUANAJUATO','QUERETARO DE ARTEAGA','HIDALGO','VERACRUZ LLAVE')] = 1
+A[c('TABASCO','NUEVO LEON','COAHUILA DE ZARAGOZA','ZACATECAS','JALISCO','GUANAJUATO','QUERETARO DE ARTEAGA','HIDALGO','VERACRUZ LLAVE'),'SAN LUIS POTOSI'] = 1
+A['CAMPECHE',c('TABASCO','QUINTANA ROO','YUCATAN')] = 1
+A[c('TABASCO','QUINTANA ROO','YUCATAN'),'CAMPECHE'] = 1
+A['BAJA CALIFORNIA SUR',c('BAJA CALIFORNIA','SONORA','SINALOA')] = 1
+A[c('BAJA CALIFORNIA','SONORA','SINALOA'),'BAJA CALIFORNIA SUR'] = 1
+A['BAJA CALIFORNIA',c('BAJA CALIFORNIA SUR','SONORA')] = 1
+A[c('BAJA CALIFORNIA SUR','SONORA'),'BAJA CALIFORNIA'] = 1
+A['AGUASCALIENTES',c('ZACATECAS','JALISCO')] = 1
+A[c('ZACATECAS','JALISCO'),'AGUASCALIENTES'] = 1
+A['YUCATAN',c('CAMPECHE','QUINTANA ROO')] = 1
+A[c('CAMPECHE','QUINTANA ROO'),'YUCATAN'] = 1
+A['TAMAULIPAS',c('NUEVO LEON','SAN LUIS POTOSI','VERACRUZ LLAVE')] = 1
+A[c('NUEVO LEON','SAN LUIS POTOSI','VERACRUZ LLAVE'),'TAMAULIPAS'] = 1
+A['TABASCO',c('CAMPECHE','CHIAPAS','VERACRUZ LLAVE')] = 1
+A[c('CAMPECHE','CHIAPAS','VERACRUZ LLAVE'),'TABASCO'] = 1
+A['SONORA',c('BAJA CALIFORNIA','BAJA CALIFORNIA SUR','SINALOA','CHIHUAHUA')] = 1
+A[c('BAJA CALIFORNIA','BAJA CALIFORNIA SUR','SINALOA','CHIHUAHUA'),'SONORA'] = 1
+A['SINALOA',c('SONORA','CHIHUAHUA','DURANGO','NAYARIT')] = 1
+A[c('SONORA','CHIHUAHUA','DURANGO','NAYARIT'),'SINALOA'] = 1
+A['QUINTANA ROO',c('YUCATAN','CAMPECHE')] = 1
+A[c('YUCATAN','CAMPECHE'),'QUINTANA ROO'] =1
+A['QUERETARO DE ARTEAGA',c('SAN LUIS POTOSI','HIDALGO','ESTADO DE MEXICO','GUANAJUATO','MICHOACAN DE OCAMPO')] = 1
+A[c('SAN LUIS POTOSI','HIDALGO','ESTADO DE MEXICO','GUANAJUATO','MICHOACAN DE OCAMPO'),'QUERETARO DE ARTEAGA'] = 1
+A['PUEBLA',c('ESTADO DE MEXICO','MORELOS','TLAXCALA','GUERRERO','OAXACA','VERACRUZ LLAVE','HIDALGO')] = 1
+A[c('ESTADO DE MEXICO','MORELOS','TLAXCALA','GUERRERO','OAXACA','VERACRUZ LLAVE','HIDALGO'),'PUEBLA'] = 1
+A['TLAXCALA',c('ESTADO DE MEXICO','HIDALGO','PUEBLA')] = 1
+A[c('ESTADO DE MEXICO','HIDALGO','PUEBLA'),'TLAXCALA'] = 1
+A['OAXACA',c('GUERRERO','PUEBLA','VERACRUZ LLAVE','CHIAPAS')] = 1
+A[c('GUERRERO','PUEBLA','VERACRUZ LLAVE','CHIAPAS'),'OAXACA'] =1
+```
+
+```{r}
+library(rstan)
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+```
+
+```{r}
+model <- stan_model('geo_extend.stan')
+data$client_income <- log(data$client_income)
+data$asset_market_value =log(data$asset_market_value)
+X <- cbind(data$client_income,
+           data$age,
+           data$asset_market_value,
+           data$factor_employed)
+colnames(X) <- c('client_income', 'age','asset market value','factor_employed employed')
+scaled_x <- scale(X)
+y = as.numeric(data$y)
+state = as.vector(data$state)
+unique_s = unique(state)
+for (i in 1:32){
+  s = as.character(unique_s[i])
+  state[state==s] = as.numeric(i)
+}
+state = as.numeric(state)
+
+county = as.vector(data$county)
+unique_c = unique(county)
+for (i in 1:length(unique_c)){
+  c = as.character(unique_c[i])
+  county[county==c] = as.numeric(i)
+}
+county = as.numeric(county)
+#sampled <- sample(1:nrow(X),size =  round(nrow(X) / 10),replace = T)
+#X <- scaled_x[sampled,]
+#y <- y[sampled]
+#state <- state[sampled]
+data_list <- list(k = nrow(X),         # number of observations
+               n = nrow(A),
+               p = ncol(X),         # number of coefficients
+               X = X,               # design matrix
+               y = y,               # observed number of cases
+               W = A,
+               W_n = sum(A) / 2,    # number of neighbor pairs
+               state = state,
+               county = county,
+               c = length(unique_c))               # adjacency matrix
+fit <- sampling(model, data = data_list)
+print(fit, pars = c('beta','phi','lp__'))
+```
+
+```{r}
+library(bayesplot)
+library(shinystan)
+ss_mod = as.shinystan(fit)
+launch_shinystan(ss_mod)
+
+```
+
+
+
