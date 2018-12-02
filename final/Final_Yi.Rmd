@@ -1,0 +1,498 @@
+---
+title: "Final_Yi"
+output: html_document
+date: "`r format(Sys.Date())`"
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Model Extension: CAR & Zero Inflation 
+
+### A linear binormial regression analogy
+
+Lik what we did in the baseline model. We process by treating the underlying deterministic model as providing an expected default times for each city around which there will be variation due to both measurement error and simplifications. Consider the typical formulation of a linear regression, where $y_n$ is the is an observable default time, $x_n$ is a row vector of unmodeled predictors ( independent variables), $\beta$ is a coefficient vector parameter and we separate the intercep as $a$. In the city level, we assume that the number of individual records in city $i$ is $n_i$.Thus, we have the model:
+
+$$ y_i \sim Binormial(n_{i},a + x_i\beta) $$
+As a robust prior distribution option, we take $\beta \sim cauchy(location=0,scale=2.5)$.
+
+In model 2, we will extend this model in two ways: (1) incoperate the geographic state information,(2) hierarchical extension for intercept terms, (3) zero inflated model.  
+
+### Extension one: Incoperate Geographic Information
+
+In this project, we utilize the IAR prior for state feature. Intrisnic conditional autoregressive (IAR)  is an extension of conditional autoregressive (CAR) models, which are popular as prior distributions for spatial random effects with areal spatial data. In our model, we have a random quantity $\phi = (\phi_1,\phi_2,...,\phi_{32})$ at 32 state areal locations. In each state, we have the individual records aggregated at the city level. And each city data belong to one state. According to the Brook's Lemma, the joint the distribution of $\phi$ can be expressed as the followings:
+$$\phi \sim N(0,[D_{\tau} (I-\alpha B)]^{-1})$$
+In this formula, we have:
+
+* $D = diag(m_i)$ is an $32 \times 32$ diagonal matrix with $m_i$ is the number of the neighbors for the state i
+
+* $D_{\tau} = \tau D$  and $\tau$ is the hyperparameter in the conditional distributions of the $\phi$
+
+* $\alpha$ is the parameter that controls spatial dependence. In IAR, we let $\alpha =1$
+
+* $B = D^{-1} W$ is the scaled adjacency matrix. And $W$ is the adjacency matrix. ($w_{ii}=0$,$w_{ij}=1$ if the state i is a neighbor of state j , and $w_{ij}=1$ otherwise)
+
+We can simplifies the IAR model to:
+
+$$\phi \sim N(0,\tau (D-W)]^{-1})$$
+In IAR model, we have a singular precision matrix and an improper prior distribution. However, in practice, IAR models are fit with a sum to zero constrains: $\sum_{i} \phi_i = 0 $ for each connected component of the graph. In this way, we can interpret both overall means and the component-wise means.
+
+Through log probability accumulator, we can accure computational efficiency gains. We have:
+
+$$log(p(\phi | \tau)) = -\frac{n}{2}log(2\pi) + \frac{1}{2}log(det^{*}(\tau(D-W))) - \frac{1}{2}\phi^{T}\tau(D-W)\phi$$
+$$=-\frac{n}{2}log(2\pi) + \frac{1}{2}log(\tau^{n-k}) + \frac{1}{2}log(det^{*}(\tau(D-W))  - \frac{1}{2}\phi^{T}\tau(D-W)\phi$$
+
+In this formula, $det^{*}(A)$ is the generlized determinant of the square matrix A defined as the product of its non-zero eigenvalues, and the k is the number of the connented component in the graph.(k=1 for our data) Dropping the additive constants, the qunantity to increment becomes:
+
+$$  \frac{1}{2}log(\tau^{n-k}) - \frac{1}{2}\phi^{T}\tau(D-W)\phi $$
+
+In  our model, we assume the hyperparameter $\tau \sim Gamma(2,2)$. We define the sparse_iar_lpdf function as a more efficient spare representation as the following:
+
+```{r eval=FALSE}
+functions {
+  real sparse_iar_lpdf(vector phi, real tau, int[,] W_sparse, vector D_sparse, vector lambda, int S, int W_n) {
+      row_vector[S] phit_D; // phi' * D
+      row_vector[S] phit_W; // phi' * W
+      vector[S] ldet_terms;
+    
+      phit_D = (phi .* D_sparse)';
+      phit_W = rep_row_vector(0, S);
+      for (i in 1:W_n) {
+        phit_W[W_sparse[i, 1]] = phit_W[W_sparse[i, 1]] + phi[W_sparse[i, 2]];
+        phit_W[W_sparse[i, 2]] = phit_W[W_sparse[i, 2]] + phi[W_sparse[i, 1]];
+      }
+    
+      return 0.5 * ((S-1) * log(tau)
+                    - tau * (phit_D * phi - (phit_W * phi)));
+  }
+}
+```
+
+### Extension two: Hierarchical extension for intercept terms
+
+In our model, we let the intercept term $a$ in our model base on the IAR prior $\phi$. At the same time, we take the cauchy distribution to let the model to be more robust. Since the a is the intercept term in the binormail regression. We assume the scale to be 10.  For the $j$ th city in the $i$ the state, we have:
+
+$$a_{ij} \sim cauchy(location=\phi_i,scale= 10)$$
+In this way, $a$ is the state-level effect which represent the overall effects from the factors we have not taken as independent variables. There are two resons we do not take the hierarchical extension for the coefficient terms.
+
+1. Hierarchical extension for the $\beta$s will greatly expend the demension of the parameter space. Originally, we have 1 intercept and 7 coefficient in the binormial regression model (total 8 parameters). If we take the hierarchical extension both on the intercept and coefficient terms, there will have $32 \times 1 = 32$ intercept paramters and $32 \times 7 = 224$ coefficient parameters (total 256 parameters). Now, we have$32 \times 1 = 32$ intercept paramters and 7 coefficient parameters (total 39 parameters). This is more acceptable.
+
+2. Now the coefficient terms are not depend on the state prior. Thus, we can estimate the overall effect from these independent variables, like age and income.
+
+### Extension three: zero inflated model
+
+Zero-inflated model originally provide mixture of a mixtures of a Poisson and Bernoulli probability mass function to allow more flexibility in modeling the probability of a zero outcome. Zero-inflated models, as defined by Lambert (1992), add additional probability mass to the outcome of zero. But, this extension can also be applied for other categorical distributions like binomial distribution we used in this project. 
+
+We assume a parameter $\theta$ as the probability of drawing a zero and the probability $1-\theta$ as drawing fro mthe Binormal distribution. The distribution function is thus:
+
+$$p(y_n | \theta,a,\beta) =\begin{cases} 
+\theta + (1-\theta) \times Binomial(0 |a,\beta ) & y_n =0 \\
+(1-\theta) \times Binomial(0 |a,\beta )  & y_n > 0 \end{cases}$$
+
+In stan, we estimate the model in this following ways:
+
+```{r eval=FALSE}
+for (j in 1:N_train){
+    if (y[j] == 0){
+      target += log_sum_exp(bernoulli_lpmf(1 | theta), bernoulli_lpmf(0 | theta) + binomial_logit_lpmf(y[j] | n_city_train[j],alpha[state_train[j]] + X_train[j,]* beta));
+      }
+    else{
+      target += bernoulli_lpmf(0 | theta) + binomial_logit_lpmf(y[j] | n_city_train[j],alpha + X_train[j,] * beta);}
+  }
+```
+
+And we predict the $y_rep$ in the following way:
+
+```{r eval=FALSE}
+generated quantities{
+  int y_rep[N_train];
+  real<lower =0,upper=1> zero_train[N_train];
+  for (i in 1:N_train){
+    zero_train[i] = uniform_rng(0,1);
+    if (zero_train[i] < theta){
+      y_rep[i] = 0;
+      }
+    else{
+      y_rep[i] = binomial_rng(n_city_train[i],inv_logit(alpha[state_train[i]] + X_train[i,]* beta));
+      }
+  }
+}
+```
+
+
+### Model Coveage testing wit fake data.
+
+In this part, we first simulate the fake data as we assume in thie model. Then, we will check that our model works well with the data that we have simulated ourselves. In this following are the model coverage plots.
+
+
+
+### Model result
+
+In the following is the basic model results:
+
+```{r eval=FALSE}
+
+```
+
+
+
+
+### Model summary
+
+In order to determine our model performance, again we do the cross validation. And we calculate the MSE for our model. The stan code we used to simulate the $y_hat$ is as the following:
+
+```{r eval=FALSE}
+generated quantities{
+  int y_rep_cv[N_test];
+  real<lower =0,upper=1> zero_test[N_test];
+  for (i in 1:N_test){
+    zero_test[i] = uniform_rng(0,1);
+    if (zero_test[i] < theta){
+      y_rep_cv[i] = 0;
+      }
+    else{
+      y_rep_cv[i] = binomial_rng(n_city_test[i],inv_logit( alpha[state_test[i]] + X_test[i,]* beta));
+      }
+  }
+}
+```
+
+
+And it shows that the cross validation for model 2 is : ** **. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r  include=FALSE}
+library(knitr);library(arm);library(ggplot2)
+library(MASS);library(tidyr);library(dplyr)
+library(extraDistr);library(gridExtra)
+library(rstan);library(bayesplot);library(loo)
+library(shinystan);library(readr)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+
+knitr::opts_chunk$set(
+	eval = FALSE,
+	error = FALSE,
+	message = FALSE,
+	warning = FALSE,
+	comment = NA,
+	include = FALSE
+)
+options(xtable.comment = FALSE)
+options(htmltools.dir.version = FALSE)
+options(digits = 2)
+```
+
+
+```{r eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+file <-  '../data/core.txt'
+data <- read_delim(file = file, delim = '|')
+
+# Sample the data
+pct = 1
+# pct = 0.1
+# pct = 0.01
+set.seed(seed = 42)
+sample_size = round(pct * nrow(data))
+sample <- sample(x = nrow(data), size = sample_size, replace = F)
+data = data[sample, ]
+## Selecting the relevant columns for the analysis
+data_sub <- data %>% dplyr::select(
+  state,
+  city,
+  county,
+  zip,
+  asset_market_value,
+  mar_2_app,
+  appraisal_value,
+  app_2_inc,
+  client_income,
+  mar_2_inc,
+  age,
+  sex_F,
+  condition_U,
+  y,
+  y2)
+
+## Group data by state and define the IDs
+state_summary <- data_sub %>% 
+  dplyr::select(state, 
+                client_income, 
+                appraisal_value,
+                asset_market_value) %>% 
+  group_by(state) %>% 
+  summarize(n_state = n(),
+            income_mean_state = mean(client_income),
+            appraisal_mean_state = mean(appraisal_value),
+            market_mean_state = mean(asset_market_value)) %>% 
+  arrange(desc(n_state)) %>% 
+  ungroup()
+state_summary$ID_state = seq.int(nrow(state_summary))
+
+
+## Group data by city and define the IDs
+city_summary <- data_sub %>% 
+  dplyr::select(city, state,
+                client_income,
+                appraisal_value,
+                asset_market_value,
+                mar_2_inc,
+                mar_2_app,
+                app_2_inc,
+                age,
+                y,
+                y2) %>% 
+  group_by(city, state) %>% 
+  summarize(n_city = n(),
+            income_mean_city = mean(client_income),
+            appraisal_mean_city = mean(appraisal_value),
+            market_mean_city = mean(asset_market_value),
+            
+            mar_2_inc_mean_city = mean(mar_2_inc),
+            mar_2_app_mean_city = mean(mar_2_app),
+            app_2_inc_mean_city = mean(app_2_inc),
+            
+            age_mean_city = mean(age),
+            sum_y = sum(y),
+            sum_y2 = sum(y2)) %>% 
+  arrange(desc(n_city)) %>% 
+  ungroup()
+
+
+## Merge back into data
+city_summary <- city_summary %>% 
+  inner_join(y = state_summary[c('ID_state', 'state')], by = 'state')
+```
+
+
+```{r eval=FALSE, include=FALSE}
+N = length(unique(city_summary$state))
+A <- matrix(0,ncol = N,nrow = N)
+colnames(A) = unique(city_summary$state)
+rownames(A) = unique(city_summary$state)
+A['NUEVO LEON',c('ZACATECAS','SAN LUIS POTOSI','TAMAULIPAS','COAHUILA DE ZARAGOZA')] = 1
+A[c('ZACATECAS','SAN LUIS POTOSI','TAMAULIPAS','COAHUILA DE ZARAGOZA'),'NUEVO LEON'] = 1
+A['VERACRUZ LLAVE',c('TAMAULIPAS','SAN LUIS POTOSI','HIDALGO','PUEBLA','OAXACA','CHIAPAS','TABASCO')] = 1
+A[c('TAMAULIPAS','SAN LUIS POTOSI','HIDALGO','PUEBLA','OAXACA','CHIAPAS','TABASCO'),'VERACRUZ LLAVE'] = 1
+A['GUANAJUATO',c('MICHOACAN DE OCAMPO','JALISCO','SAN LUIS POTOSI','ZACATECAS','QUERETARO DE ARTEAGA')] = 1
+A[c('MICHOACAN DE OCAMPO','JALISCO','SAN LUIS POTOSI','ZACATECAS','QUERETARO DE ARTEAGA'),'GUANAJUATO'] = 1
+A['NAYARIT',c('SINALOA','DURANGO','ZACATECAS','JALISCO')] = 1
+A[c('SINALOA','DURANGO','ZACATECAS','JALISCO'),'NAYARIT'] = 1
+A['JALISCO',c('NAYARIT','ZACATECAS','COLIMA','MICHOACAN DE OCAMPO','GUANAJUATO','AGUASCALIENTES')] = 1
+A[c('NAYARIT','ZACATECAS','COLIMA','MICHOACAN DE OCAMPO','GUANAJUATO','AGUASCALIENTES'),'JALISCO'] = 1
+A['DISTRITO FEDERAL',c('ESTADO DE MEXICO','MORELOS')] = 1
+A[c('ESTADO DE MEXICO','MORELOS'),'DISTRITO FEDERAL'] = 1
+A['MORELOS',c('GUERRERO','PUEBLA','ESTADO DE MEXICO')] = 1
+A[c('GUERRERO','PUEBLA','ESTADO DE MEXICO'),'MORELOS'] = 1
+A['MICHOACAN DE OCAMPO',c('COAHUILA DE ZARAGOZA','ESTADO DE MEXICO','JALISCO','GUANAJUATO','GUERRERO','QUERETARO DE ARTEAGA')] = 1
+A[c('COAHUILA DE ZARAGOZA','JALISCO','ESTADO DE MEXICO','GUANAJUATO','GUERRERO','QUERETARO DE ARTEAGA'),'MICHOACAN DE OCAMPO'] = 1
+A['ESTADO DE MEXICO',c('HIDALGO','QUERETARO DE ARTEAGA','MICHOACAN DE OCAMPO','GUERRERO','PUEBLA','TLAXCALA','MORELOS')] = 1
+A[c('HIDALGO','QUERETARO DE ARTEAGA','MICHOACAN DE OCAMPO','GUERRERO','PUEBLA','TLAXCALA','MORELOS'), 'ESTADO DE MEXICO'] = 1
+A['HIDALGO',c('ESTADO DE MEXICO','QUERETARO DE ARTEAGA','SAN LUIS POTOSI','VERACRUZ LLAVE','PUEBLA','TLAXCALA')] = 1
+A[c('ESTADO DE MEXICO','QUERETARO DE ARTEAGA','SAN LUIS POTOSI','VERACRUZ LLAVE','PUEBLA','TLAXCALA'),'HIDALGO'] = 1
+A['ZACATECAS',c('JALISCO','NAYARIT','DURANGO','COAHUILA DE ZARAGOZA','NUEVO LEON','TAMAULIPAS','SAN LUIS POTOSI','AGUASCALIENTES')] = 1
+A[c('JALISCO','NAYARIT','DURANGO','COAHUILA DE ZARAGOZA','NUEVO LEON','TAMAULIPAS','SAN LUIS POTOSI','AGUASCALIENTES'),'ZACATECAS'] = 1
+A['GUERRERO',c('MICHOACAN DE OCAMPO','PUEBLA','ESTADO DE MEXICO','MORELOS')] = 1
+A[c('MICHOACAN DE OCAMPO','PUEBLA','ESTADO DE MEXICO','MORELOS'),'GUERRERO'] = 1
+A['DURANGO',c('CHIHUAHUA','COAHUILA DE ZARAGOZA','ZACATECAS','NAYARIT','SINALOA')] = 1
+A[c('CHIHUAHUA','COAHUILA DE ZARAGOZA','ZACATECAS','NAYARIT','SINALOA'),'DURANGO'] = 1
+A['CHIHUAHUA',c('DURANGO','SINALOA','COAHUILA DE ZARAGOZA','SONORA')] = 1
+A[c('DURANGO','SINALOA','COAHUILA DE ZARAGOZA','SONORA'),'CHIHUAHUA'] = 1
+A['CHIAPAS',c('OAXACA','VERACRUZ LLAVE','TABASCO','CAMPECHE')] = 1
+A[c('OAXACA','VERACRUZ LLAVE','TABASCO','CAMPECHE'),'CHIAPAS'] = 1
+A['COLIMA',c('JALISCO','MICHOACAN DE OCAMPO')] = 1
+A[c('JALISCO','MICHOACAN DE OCAMPO'),'COLIMA'] = 1　
+A['COAHUILA DE ZARAGOZA',c('NUEVO LEON','ZACATECAS','DURANGO','CHIHUAHUA','SAN LUIS POTOSI')] = 1
+A[c('NUEVO LEON','ZACATECAS','DURANGO','CHIHUAHUA','SAN LUIS POTOSI'),'COAHUILA DE ZARAGOZA'] = 1
+A['SAN LUIS POTOSI',c('TABASCO','NUEVO LEON','COAHUILA DE ZARAGOZA','ZACATECAS','JALISCO','GUANAJUATO','QUERETARO DE ARTEAGA','HIDALGO','VERACRUZ LLAVE')] = 1
+A[c('TABASCO','NUEVO LEON','COAHUILA DE ZARAGOZA','ZACATECAS','JALISCO','GUANAJUATO','QUERETARO DE ARTEAGA','HIDALGO','VERACRUZ LLAVE'),'SAN LUIS POTOSI'] = 1
+A['CAMPECHE',c('TABASCO','QUINTANA ROO','YUCATAN')] = 1
+A[c('TABASCO','QUINTANA ROO','YUCATAN'),'CAMPECHE'] = 1
+A['BAJA CALIFORNIA SUR',c('BAJA CALIFORNIA','SONORA','SINALOA')] = 1
+A[c('BAJA CALIFORNIA','SONORA','SINALOA'),'BAJA CALIFORNIA SUR'] = 1
+A['BAJA CALIFORNIA',c('BAJA CALIFORNIA SUR','SONORA')] = 1
+A[c('BAJA CALIFORNIA SUR','SONORA'),'BAJA CALIFORNIA'] = 1
+A['AGUASCALIENTES',c('ZACATECAS','JALISCO')] = 1
+A[c('ZACATECAS','JALISCO'),'AGUASCALIENTES'] = 1
+A['YUCATAN',c('CAMPECHE','QUINTANA ROO')] = 1
+A[c('CAMPECHE','QUINTANA ROO'),'YUCATAN'] = 1
+A['TAMAULIPAS',c('NUEVO LEON','SAN LUIS POTOSI','VERACRUZ LLAVE')] = 1
+A[c('NUEVO LEON','SAN LUIS POTOSI','VERACRUZ LLAVE'),'TAMAULIPAS'] = 1
+A['TABASCO',c('CAMPECHE','CHIAPAS','VERACRUZ LLAVE')] = 1
+A[c('CAMPECHE','CHIAPAS','VERACRUZ LLAVE'),'TABASCO'] = 1
+A['SONORA',c('BAJA CALIFORNIA','BAJA CALIFORNIA SUR','SINALOA','CHIHUAHUA')] = 1
+A[c('BAJA CALIFORNIA','BAJA CALIFORNIA SUR','SINALOA','CHIHUAHUA'),'SONORA'] = 1
+A['SINALOA',c('SONORA','CHIHUAHUA','DURANGO','NAYARIT')] = 1
+A[c('SONORA','CHIHUAHUA','DURANGO','NAYARIT'),'SINALOA'] = 1
+A['QUINTANA ROO',c('YUCATAN','CAMPECHE')] = 1
+A[c('YUCATAN','CAMPECHE'),'QUINTANA ROO'] =1
+A['QUERETARO DE ARTEAGA',c('SAN LUIS POTOSI','HIDALGO','ESTADO DE MEXICO','GUANAJUATO','MICHOACAN DE OCAMPO')] = 1
+A[c('SAN LUIS POTOSI','HIDALGO','ESTADO DE MEXICO','GUANAJUATO','MICHOACAN DE OCAMPO'),'QUERETARO DE ARTEAGA'] = 1
+A['PUEBLA',c('ESTADO DE MEXICO','MORELOS','TLAXCALA','GUERRERO','OAXACA','VERACRUZ LLAVE','HIDALGO')] = 1
+A[c('ESTADO DE MEXICO','MORELOS','TLAXCALA','GUERRERO','OAXACA','VERACRUZ LLAVE','HIDALGO'),'PUEBLA'] = 1
+A['TLAXCALA',c('ESTADO DE MEXICO','HIDALGO','PUEBLA')] = 1
+A[c('ESTADO DE MEXICO','HIDALGO','PUEBLA'),'TLAXCALA'] = 1
+A['OAXACA',c('GUERRERO','PUEBLA','VERACRUZ LLAVE','CHIAPAS')] = 1
+A[c('GUERRERO','PUEBLA','VERACRUZ LLAVE','CHIAPAS'),'OAXACA'] =1
+
+```
+
+
+
+```{r eval=FALSE, include=FALSE}
+
+## Rescaling
+inputs <- city_summary %>%
+  mutate(
+    market_state_city = (log(market_mean_city) - mean(log(market_mean_city))) /
+      sd(log(market_mean_city)),
+    
+    income_state_city = (log(appraisal_mean_city) - mean(log(appraisal_mean_city))) /
+      sd(log(appraisal_mean_city)),
+    
+    appraisal_state_city = (log(appraisal_mean_city) -
+                            mean(log(appraisal_mean_city))) /
+      sd(log(appraisal_mean_city)),
+    
+    mar_2_inc_city = (mar_2_inc_mean_city - mean(mar_2_inc_mean_city)) / sd(mar_2_inc_mean_city),
+    
+    app_2_inc_city = (app_2_inc_mean_city - mean(app_2_inc_mean_city)) / sd(app_2_inc_mean_city),
+    
+    mar_2_app_city = (mar_2_app_mean_city - mean(mar_2_app_mean_city)) / sd(mar_2_app_mean_city),
+    
+    age_city = (age_mean_city - mean(age_mean_city)) / sd(age_mean_city)) %>% 
+  dplyr::select(
+    market_state_city,
+    income_state_city,
+    appraisal_state_city,
+    mar_2_inc_city,
+    app_2_inc_city,
+    mar_2_app_city,
+    age_city,
+    ID_state,
+    n_city,
+    sum_y,
+    sum_y2
+  )
+
+
+## Train / Test split
+set.seed(seed = 81989843)
+pct_train = 0.8
+sample_size = round(pct_train * nrow(inputs))
+sample <- sample(x = nrow(inputs), size = sample_size, replace = F)
+
+## Allocate train
+y = inputs$sum_y
+y2 = inputs$sum_y2
+
+inputs_train = inputs[sample, ]
+y_train = y[sample]
+
+## Allocate test
+inputs_test = inputs[-sample, ]
+y_test = y[-sample]
+
+## Inputs for STAN
+n_city_train = inputs_train$n_city
+n_city_test = inputs_test$n_city
+
+
+X_train = inputs_train %>% dplyr::select(-ID_state,-n_city,-sum_y, -sum_y2)
+X_test = inputs_test %>% dplyr::select(-ID_state,-n_city,-sum_y, -sum_y2)
+
+N_train = nrow(X_train)
+N_test = nrow(X_test)
+
+D = ncol(X_train)
+S = length(unique(data_sub$state))
+state_train = inputs_train$ID_state
+state_test = inputs_test$ID_state
+
+model2_data = list(S=S,N_train=N_train, N_test=N_test, D=D,state_train = state_train,state_test = state_test,
+                  X_train=X_train, X_test=X_test,W = A,W_n = sum(A) / 2,
+                  n_city_train = n_city_train, 
+                     n_city_test = n_city_test,
+                     y = y_train)
+```
+
+
+
+```{r eval=FALSE, message=FALSE, warning=FALSE, include=FALSE, results='hide'}
+model2 = stan_model('Model2.stan')
+fit2 <- sampling(model2, data=model2_data,seed=1234)
+```
+
+
+```{r eval=FALSE, include=FALSE}
+sims <- rstan::extract(fit1)
+# a_median <- median(sims$a)
+# beta_median <- apply(X = sims$beta, MARGIN = 2, FUN = median)
+# 
+# y_hat <- N_test * invlogit(a_median + as.matrix(X_test)%*%beta_median)
+
+# mode <- function(x) {
+#   ux <- unique(x)
+#   ux[which.max(tabulate(match(x, ux)))]
+# }
+
+y_hat <- apply(X = sims$y_rep_cv, MARGIN = 2, FUN = median)  
+
+test_df = data.frame(ID_state = inputs_test$ID_state,
+                     y_test = y_test,
+                     y_hat = y_hat)
+
+test_df <- test_df %>% 
+  summarize(y_sum_test = sum(y_test),
+            y_sum_hat = sum(y_hat)) %>% 
+  arrange(desc(y_sum_test)) %>% 
+  ungroup()
+
+accuracy_baseline = mean(abs(test_df$y_sum_test) ** 2)
+accuracy = mean(abs(test_df$y_sum_hat - test_df$y_sum_test) ** 2)
+cat('\nBaseline MSE: ', accuracy_baseline * 100)
+cat('\nLogistic MSE: ', accuracy * 100)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
