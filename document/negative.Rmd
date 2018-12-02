@@ -1,0 +1,210 @@
+---
+title: "BDA_final_project"
+author: 'Jongwoo Choi'
+date: "`r format(Sys.Date())`"
+output: pdf_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+library(knitr);library(arm);library(ggplot2)
+library(MASS);library(tidyr);library(dplyr)
+library(extraDistr);library(gridExtra)
+library(rstan);library(bayesplot);library(loo)
+library(shinystan);library(readr)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, error=FALSE, comment=NA)
+options(xtable.comment = FALSE)
+options(htmltools.dir.version = FALSE)
+options(digits = 2)
+
+print_file <- function(file) {
+  cat(paste(readLines(file), "\n", sep=""), sep="")
+}
+```
+
+
+```{r Load the data, message=FALSE, warning=FALSE}
+file <-  'data/core.txt'
+data <- read_delim(file = file, delim = '|')
+
+# Sample the data
+pct = 1
+# pct = 0.1
+# pct = 0.01
+set.seed(seed = 42)
+sample_size = round(pct * nrow(data))
+sample <- sample(x = nrow(data), size = sample_size, replace = F)
+data = data[sample, ]
+## Selecting the relevant columns for the analysis
+data_sub <- data %>% dplyr::select(
+  state,
+  city,
+  county,
+  zip,
+  asset_market_value,
+  mar_2_app,
+  appraisal_value,
+  app_2_inc,
+  client_income,
+  mar_2_inc,
+  age,
+  sex_F,
+  condition_U,
+  y,
+  y2)
+summary(data_sub)
+
+
+## Group data by state and define the IDs
+state_summary <- data_sub %>% 
+  dplyr::select(state, 
+                client_income, 
+                appraisal_value,
+                asset_market_value) %>% 
+  group_by(state) %>% 
+  summarize(n_state = n(),
+            income_mean_state = mean(client_income),
+            appraisal_mean_state = mean(appraisal_value),
+            market_mean_state = mean(asset_market_value)) %>% 
+  arrange(desc(n_state)) %>% 
+  ungroup()
+state_summary$ID_state = seq.int(nrow(state_summary))
+
+
+## Group data by city and define the IDs
+city_summary <- data_sub %>% 
+  dplyr::select(city, state,
+                client_income,
+                appraisal_value,
+                asset_market_value,
+                mar_2_inc,
+                mar_2_app,
+                app_2_inc,
+                age,
+                y,
+                y2) %>% 
+  group_by(city, state) %>% 
+  summarize(n_city = n(),
+            income_mean_city = mean(client_income),
+            appraisal_mean_city = mean(appraisal_value),
+            market_mean_city = mean(asset_market_value),
+            
+            mar_2_inc_mean_city = mean(mar_2_inc),
+            mar_2_app_mean_city = mean(mar_2_app),
+            app_2_inc_mean_city = mean(app_2_inc),
+            
+            age_mean_city = mean(age),
+            sum_y = sum(y),
+            sum_y2 = sum(y2)) %>% 
+  arrange(desc(n_city)) %>% 
+  ungroup()
+
+
+## Merge back into data
+city_summary <- city_summary %>% 
+  inner_join(y = state_summary[c('ID_state', 'state')], by = 'state')
+
+
+## Rescaling
+inputs <- city_summary %>%
+  mutate(
+    market_state_city = (log(market_mean_city) - mean(log(market_mean_city))) /
+      sd(log(market_mean_city)),
+    
+    income_state_city = (log(appraisal_mean_city) - mean(log(appraisal_mean_city))) /
+      sd(log(appraisal_mean_city)),
+    
+    appraisal_state_city = (log(appraisal_mean_city) -
+                            mean(log(appraisal_mean_city))) /
+      sd(log(appraisal_mean_city)),
+    
+    mar_2_inc_city = (mar_2_inc_mean_city - mean(mar_2_inc_mean_city)) / sd(mar_2_inc_mean_city),
+    
+    app_2_inc_city = (app_2_inc_mean_city - mean(app_2_inc_mean_city)) / sd(app_2_inc_mean_city),
+    
+    mar_2_app_city = (mar_2_app_mean_city - mean(mar_2_app_mean_city)) / sd(mar_2_app_mean_city),
+    
+    age_city = (age_mean_city - mean(age_mean_city)) / sd(age_mean_city)) %>% 
+  dplyr::select(
+    market_state_city,
+    income_state_city,
+    appraisal_state_city,
+    mar_2_inc_city,
+    app_2_inc_city,
+    mar_2_app_city,
+    age_city,
+    ID_state,
+    n_city,
+    sum_y,
+    sum_y2
+  )
+
+
+## Train / Test split
+set.seed(seed = 81989843)
+pct_train = 0.8
+sample_size = round(pct_train * nrow(inputs))
+sample <- sample(x = nrow(inputs), size = sample_size, replace = F)
+
+## Allocate train
+y = inputs$sum_y
+y2 = inputs$sum_y2
+
+inputs_train = inputs[sample, ]
+y_train = y[sample]
+
+## Allocate test
+inputs_test = inputs[-sample, ]
+y_test = y[-sample]
+
+## Inputs for STAN
+X_train = inputs_train %>% dplyr::select(-sum_y, -sum_y2)
+X_test = inputs_test %>% dplyr::select(-sum_y, -sum_y2)
+
+N_train = nrow(X_train)
+N_test = nrow(X_test)
+
+n_city_train = X_train$n_city
+n_city_test = X_test$n_city
+
+D = ncol(X_train)
+S = length(unique(data_sub$state))
+state = data_sub$ID_state[sample]
+
+baseline_data = list(N_train=N_train, N_test=N_test, D=D, 
+                     X_train=X_train, X_test=X_test,
+                     n_city_train = n_city_train, 
+                     n_city_test = n_city_test,
+                     y_train = y_train)
+```
+
+
+# Baseline model
+
+```{r results='hide', warning=FALSE, message=FALSE}
+baseline_model = stan_model('negative.stan')
+fit1 <- sampling(baseline_model, data=baseline_data)
+fit1
+```
+
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
