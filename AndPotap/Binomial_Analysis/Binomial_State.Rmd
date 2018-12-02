@@ -1,5 +1,5 @@
 ---
-title: "Logistic Binomial"
+title: "Binomial with State Intercept"
 author: "Andres Potapczynski (ap3635)"
 output: pdf_document
 ---
@@ -17,21 +17,23 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r Files, include=FALSE}
 file <-  '../DBs/core.txt'
-file_model <- './Models/binomial_v01.stan'
+# file_model <- './Models/binomial_state_v01.stan'
+file_model <- './Models/binomial_state_v04.stan'
 SEED = 1234
 SEED_TRAIN = 81989843
 CHAINS = 8
 ITER = 2000
 pct_train = 0.8
+pct = 1
+# pct = 0.1
+# pct = 0.01
+comp_sm <- stan_model(file_model)
 ```
 
 ```{r Load the data, include=FALSE}
 data <- read_delim(file = file, delim = '|')
 
 # Sample the data
-pct = 1
-# pct = 0.1
-# pct = 0.01
 set.seed(seed = SEED)
 sample_size = round(pct * nrow(data))
 sample <- sample(x = nrow(data), size = sample_size, replace = F)
@@ -130,6 +132,7 @@ inputs <- geo %>%
     market_st,
     age_st,
     N_state,
+    ID_state,
     y_sum
   )
 
@@ -156,26 +159,28 @@ data_stan_train <- list(N=nrow(inputs_train),
                         y=y_train)
 
 ## Inputs for STAN
-X_train = inputs_train %>% dplyr::select(-y_sum, -N_state)
-X_test = inputs_test %>% dplyr::select(-y_sum, -N_state)
+X_train = inputs_train %>% dplyr::select(-y_sum, -N_state, -ID_state)
+X_test = inputs_test %>% dplyr::select(-y_sum, -N_state, -ID_state)
 D = ncol(X_train)
 N_train = nrow(X_train)
 N_test = nrow(X_test)
 State_N_train = inputs$N_state[sample]
 State_N_test = inputs$N_state[-sample]
+State_train = inputs$ID_state[sample]
+State_test = inputs$ID_state[-sample]
+S = length(unique(data_sub$state))
 
 data_stan_train = list(N_train=N_train,
                        N_test=N_test,
                        State_N_train=State_N_train,
                        State_N_test=State_N_test,
+                       S=S,
+                       State_train=State_train,
+                       State_test=State_test,
                        D=D,
                        X_train=X_train,
                        X_test=X_test,
                        y_train=y_train)
-```
-
-```{r Compile the model}
-comp_sm <- stan_model(file_model)
 ```
 
 ```{r Run first STAN model, include=FALSE}

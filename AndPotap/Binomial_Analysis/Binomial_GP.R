@@ -18,13 +18,16 @@ pct = 1
 # pct = 0.01
 
 CHAINS = 8
-ITER = 2000
+ITER = 3000
+SEED = 1234
+SEED_TRAIN = 81989843
+pct_train = 0.8
 #####################################################################
 
 data <- read_delim(file = file, delim = '|')
 
 # Sample the data
-set.seed(seed = 42)
+set.seed(seed = SEED)
 sample_size = round(pct * nrow(data))
 sample <- sample(x = nrow(data), size = sample_size, replace = F)
 data = data[sample, ]
@@ -114,19 +117,19 @@ inputs <- geo %>%
   ) %>% 
   dplyr::select(
     income_st,
-    # mar_2_inc_st,
+    mar_2_inc_st,
     appraisal_st,
     app_2_inc_st,
-    # mar_2_app_st,
-    # market_st,
+    mar_2_app_st,
+    market_st,
     age_st,
     N_state,
     y_sum
   )
 
 ## Train / Test split
-set.seed(seed = 81989843)
-pct_train = 0.9
+set.seed(seed = SEED_TRAIN)
+pct_train = pct_train
 sample_size = round(pct_train * nrow(inputs))
 sample <- sample(x = nrow(inputs), size = sample_size, replace = F)
 
