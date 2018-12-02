@@ -30,6 +30,7 @@ file_model_binomial_ext <- '../Analysis/binomial_spatial_02.stan'
 ```
 
 # Abstract
+# Add the summary table
 
 # Setting the preamble
 

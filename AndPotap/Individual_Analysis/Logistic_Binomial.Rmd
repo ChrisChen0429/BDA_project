@@ -1,5 +1,5 @@
 ---
-title: "Simple Logistic"
+title: "Logistic Binomial"
 author: "Andres Potapczynski (ap3635)"
 output: pdf_document
 ---
@@ -17,8 +17,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r Files, include=FALSE}
 file <-  '../DBs/core.txt'
-# file_model_logistic <- './Models/logistic_gp_v01.stan'
-file_model_logistic <- './Models/logistic_gp_multi_v02.stan'
+file_model <- './Models/logistic_base_var_v01.stan'
 ```
 
 ```{r Load the data, include=FALSE}
@@ -52,12 +51,32 @@ data_sub <- data %>% dplyr::select(
   y2)
 summary(data_sub)
 
+## Create geographical 
+geo <- data_sub %>% 
+  group_by(city) %>% 
+  summarize(market_mean = mean(asset_market_value),
+            appraisal_mean = mean(appraisal_value),
+            income_mean = mean(client_income),
+            mar_2_inc_mean = mean(mar_2_inc),
+            app_2_inc_mean = mean(app_2_inc),
+            mar_2_app_mean = mean(mar_2_app),
+            age_mean = mean(age),
+            y_sum = sum(y),
+            state_n = n()) %>% 
+  ungroup()
+
 
 ## Group data by state and define the IDs
 state_summary <- data_sub %>% 
-  dplyr::select(state) %>% 
+  dplyr::select(state, 
+                client_income, 
+                appraisal_value,
+                asset_market_value) %>% 
   group_by(state) %>% 
-  summarize(n_state = n()) %>% 
+  summarize(n_state = n(),
+            income_mean_state = mean(client_income),
+            appraisal_mean_state = mean(appraisal_value),
+            market_mean_state = mean(asset_market_value)) %>% 
   arrange(desc(n_state)) %>% 
   ungroup()
 
@@ -75,32 +94,38 @@ city_summary$ID_city = seq.int(nrow(city_summary))
 
 ## Merge back into data
 data_sub <- data_sub %>% 
-  inner_join(y = state_summary[, c('state', 'ID_state')], by = 'state') %>%
+  inner_join(y = state_summary, by = 'state') %>%
   inner_join(y = city_summary[, c('city', 'ID_city')], by = 'city')
 ```
 
 ```{r Prep data for STAN model}
 ## Rescaling
-inputs <- data_sub %>%
+inputs <- geo %>%
   mutate(
-    income_st = (log(client_income) - mean(log(client_income))) / sd(log(client_income)),
-    appraisal_st = (log(appraisal_value) - mean(log(appraisal_value))) / sd(log(appraisal_value)),
-    market_st = (log(asset_market_value) - mean(log(asset_market_value))) / sd(log(asset_market_value)),
-    mar_2_inc_st = (mar_2_inc - mean(mar_2_inc)) / sd(mar_2_inc),
-    app_2_inc_st = (app_2_inc - mean(app_2_inc)) / sd(app_2_inc),
-    mar_2_app_st = (mar_2_app - mean(mar_2_app)) / sd(mar_2_app),
-    age_st = (age - mean(age)) / sd(age)
+    
+    income_st = (log(income_mean) - mean(log(income_mean))) /
+      sd(log(income_mean)),
+    
+    appraisal_st = (log(appraisal_mean) - mean(log(appraisal_mean))) /
+      sd(log(appraisal_mean)),
+    
+    market_st = (log(market_mean) - mean(log(market_mean))) /
+      sd(log(market_mean)),
+    
+    mar_2_inc_st = (mar_2_inc_mean - mean(mar_2_inc_mean)) / sd(mar_2_inc_mean),
+    app_2_inc_st = (app_2_inc_mean - mean(app_2_inc_mean)) / sd(app_2_inc_mean),
+    mar_2_app_st = (mar_2_app_mean - mean(mar_2_app_mean)) / sd(mar_2_app_mean),
+    age_st = (age_mean - mean(age_mean)) / sd(age_mean)
          ) %>% 
   dplyr::select(
     income_st,
-    # mar_2_inc_st,
+    mar_2_inc_st,
     appraisal_st,
-    # app_2_inc_st,
-    # mar_2_app_st,
-    # market_st,
+    app_2_inc_st,
+    mar_2_app_st,
+    market_st,
     age_st,
-    y,
-    y2
+    y_sum
   )
 
 ## Train / Test split
@@ -110,7 +135,7 @@ sample_size = round(pct_train * nrow(inputs))
 sample <- sample(x = nrow(inputs), size = sample_size, replace = F)
 
 ## Allocate train
-y = inputs$y
+y = inputs$y_sum
 
 inputs_train = inputs[sample, ]
 y_train = y[sample]
@@ -126,18 +151,18 @@ data_stan_train <- list(N=nrow(inputs_train),
                         y=y_train)
 
 ## Inputs for STAN
-X_train = inputs_train %>% dplyr::select(-y, -y2)
-X_test = inputs_test %>% dplyr::select(-y, -y2)
-D = ncol(X_train)
+X_train = inputs_train %>% dplyr::select(-y)
+X_test = inputs_test %>% dplyr::select(-y)
 N = nrow(X_train)
-N1 = nrow(X_train)
-N2 = nrow(X_test)
+D = ncol(X_train)
+S = length(unique(data_sub$state))
+state = data_sub$ID_state[sample]
 
-data_stan_train = list(N1=N1, N2=N2, D=D, x1=X_train, x2=X_test, z1=y_train)
+data_stan_train = list(N=N, D=D, S=S, state=state, X=X_train, y=y_train)
 ```
 
 ```{r Compile the model}
-comp_sm <- stan_model(file_model_logistic)
+comp_sm <- stan_model(file_model)
 ```
 
 
@@ -147,30 +172,39 @@ sm.logistic_v01 = sampling(comp_sm, data=data_stan_train, iter=2000, chains=4)
 
 ```{r Print resutls of logistic regression, echo=FALSE}
 print(sm.logistic_v01,
-      pars = c('alpha', 'rho'),
+      pars = c('alpha', 'beta'),
       digits = 2, 
       probs = c(0.025, 0.5, 0.975))
 ```
 
 ```{r Extract to evaluate}
 sims <- rstan::extract(sm.logistic_v01)
-proba_hat = apply(X = sims$z2, MARGIN = 2, FUN = mean)
+alpha_median <- median(sims$alpha)
+alpha_s_median <- apply(X = sims$alpha_s, MARGIN = 2, FUN = median)
+beta_median <- apply(X = sims$beta, MARGIN = 2, FUN = median)
 ```
 
 ```{r Compute test accuracy}
-threshold = 0.1
+threshold = 0.15
 
-## Baseline calcs
 y_hat_baseline <- rep(0, times = length(y_test))
+
 accuracy_base = sum(y_hat_baseline == y_test) / length(y_test)
+
 cat('\nBaseline accuracy: ', accuracy_base * 100)
 
-## Prediction calcs
+ID_state_test = data_sub$ID_state[-sample]
+
+proba_hat <- invlogit(as.matrix(X_test) %*% beta_median +
+                        alpha_s_median[ID_state_test])
+proba_hat <- as.numeric(proba_hat)
+
 y_hat = rep(0, times = length(y_test))
 y_hat[proba_hat > threshold] = 1
 
 accuracy = sum(y_hat == y_test) / length(y_test)
 
+cat('\nProba max: ', max(proba_hat)) 
 cat('\nLogistic accuracy: ', accuracy * 100)
 cat('\nConfusion table\n')
 print(table(y_test, y_hat))
@@ -212,4 +246,11 @@ accuracy = mean(abs(test_df$y_sum_hat - test_df$y_sum_test) ** 2)
 
 cat('\nBaseline MSE: ', accuracy_baseline * 100)
 cat('\nLogistic MSE: ', accuracy * 100)
+```
+
+```{r Get the total number of people that defaulted}
+y_sum_train = sum(y_train)
+y_sum_rep = apply(X = sims$y_rep, MARGIN = 1, FUN = sum)
+cat('\nTotal training defaults: ', y_sum_train)
+cat('\nTotal replicated defaults: ', mean(y_sum_rep))
 ```

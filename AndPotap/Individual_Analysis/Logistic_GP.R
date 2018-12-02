@@ -1,10 +1,7 @@
----
-title: "Simple Logistic"
-author: "Andres Potapczynski (ap3635)"
-output: pdf_document
----
+#### Notes
+# This file runs the Logistic Gaussian Process
 
-```{r Imports, include=FALSE}
+## Imports  ######################################################
 library(rstan)
 library(tidyverse)
 library(ggplot2)
@@ -13,15 +10,17 @@ library(bayesplot)
 options(mc.cores = parallel::detectCores())
 rstan_options(auto_write = TRUE)
 knitr::opts_chunk$set(echo = TRUE)
-```
+##################################################################
 
-```{r Files, include=FALSE}
-file <-  '../DBs/core.txt'
+#### Files  ######################################################
+file <-  './data/core.txt'
 # file_model_logistic <- './Models/logistic_gp_v01.stan'
-file_model_logistic <- './Models/logistic_gp_multi_v02.stan'
-```
+file_model <- './Models/logistic_gp_multi_v02.stan'
+# file_model <- './AndPotap/Individual_Analysis/Models/logistic_gp_multi_v02.stan'
+##################################################################
 
-```{r Load the data, include=FALSE}
+##################################################################
+## Load the data
 data <- read_delim(file = file, delim = '|')
 
 # Sample the data
@@ -77,23 +76,26 @@ city_summary$ID_city = seq.int(nrow(city_summary))
 data_sub <- data_sub %>% 
   inner_join(y = state_summary[, c('state', 'ID_state')], by = 'state') %>%
   inner_join(y = city_summary[, c('city', 'ID_city')], by = 'city')
-```
+##################################################################
 
-```{r Prep data for STAN model}
+##################################################################
 ## Rescaling
 inputs <- data_sub %>%
   mutate(
-    income_st = (log(client_income) - mean(log(client_income))) / sd(log(client_income)),
-    appraisal_st = (log(appraisal_value) - mean(log(appraisal_value))) / sd(log(appraisal_value)),
-    market_st = (log(asset_market_value) - mean(log(asset_market_value))) / sd(log(asset_market_value)),
+    income_st = (log(client_income) - mean(log(client_income))) 
+    / sd(log(client_income)),
+    appraisal_st = (log(appraisal_value) - mean(log(appraisal_value))) 
+    / sd(log(appraisal_value)),
+    market_st = (log(asset_market_value) - mean(log(asset_market_value))) 
+    / sd(log(asset_market_value)),
     mar_2_inc_st = (mar_2_inc - mean(mar_2_inc)) / sd(mar_2_inc),
     app_2_inc_st = (app_2_inc - mean(app_2_inc)) / sd(app_2_inc),
     mar_2_app_st = (mar_2_app - mean(mar_2_app)) / sd(mar_2_app),
     age_st = (age - mean(age)) / sd(age)
-         ) %>% 
+  ) %>% 
   dplyr::select(
     income_st,
-    # mar_2_inc_st,
+    mar_2_inc_st,
     appraisal_st,
     # app_2_inc_st,
     # mar_2_app_st,
@@ -133,38 +135,54 @@ N = nrow(X_train)
 N1 = nrow(X_train)
 N2 = nrow(X_test)
 
-data_stan_train = list(N1=N1, N2=N2, D=D, x1=X_train, x2=X_test, z1=y_train)
-```
+data_stan_train = list(N1=N1, 
+                       N2=N2, 
+                       D=D, 
+                       x1=X_train, 
+                       x2=X_test, 
+                       z1=y_train)
+##################################################################
 
-```{r Compile the model}
+##################################################################
+## Compile the model
 comp_sm <- stan_model(file_model_logistic)
-```
+##################################################################
 
+##################################################################
+## Run the model
+sm.logistic_v01 = sampling(comp_sm, 
+                           data=data_stan_train, 
+                           iter=2000, 
+                           chains=4)
+##################################################################
 
-```{r Run first STAN model, include=FALSE}
-sm.logistic_v01 = sampling(comp_sm, data=data_stan_train, iter=2000, chains=4)
-```
-
-```{r Print resutls of logistic regression, echo=FALSE}
+##################################################################
+## Print the results
 print(sm.logistic_v01,
       pars = c('alpha', 'rho'),
       digits = 2, 
       probs = c(0.025, 0.5, 0.975))
-```
+##################################################################
 
-```{r Extract to evaluate}
+##################################################################
+## Extract the results
 sims <- rstan::extract(sm.logistic_v01)
 proba_hat = apply(X = sims$z2, MARGIN = 2, FUN = mean)
-```
+##################################################################
 
-```{r Compute test accuracy}
+##################################################################
+## Compute the test accuracy
 threshold = 0.1
+##################################################################
 
+##################################################################
 ## Baseline calcs
 y_hat_baseline <- rep(0, times = length(y_test))
 accuracy_base = sum(y_hat_baseline == y_test) / length(y_test)
 cat('\nBaseline accuracy: ', accuracy_base * 100)
+##################################################################
 
+##################################################################
 ## Prediction calcs
 y_hat = rep(0, times = length(y_test))
 y_hat[proba_hat > threshold] = 1
@@ -174,13 +192,12 @@ accuracy = sum(y_hat == y_test) / length(y_test)
 cat('\nLogistic accuracy: ', accuracy * 100)
 cat('\nConfusion table\n')
 print(table(y_test, y_hat))
-```
 
-```{r Predict at the state level}
+## Predict at the state level
 test_df = data.frame(ID_state = data_sub$ID_state[-sample],
-                        state = data_sub$state[-sample],
-                        y_test = y_test,
-                        y_hat = y_hat)
+                     state = data_sub$state[-sample],
+                     y_test = y_test,
+                     y_hat = y_hat)
 test_df <- test_df %>% 
   group_by(state) %>% 
   summarize(y_sum_test = sum(y_test),
@@ -193,13 +210,14 @@ accuracy = mean(abs(test_df$y_sum_hat - test_df$y_sum_test) ** 2)
 
 cat('\nBaseline MSE: ', accuracy_baseline * 100)
 cat('\nLogistic MSE: ', accuracy * 100)
-```
+##################################################################
 
-```{r Predict at the city level}
+##################################################################
+## Predict at the city level
 test_df = data.frame(ID_city = data_sub$ID_city[-sample],
-                        city = data_sub$city[-sample],
-                        y_test = y_test,
-                        y_hat = y_hat)
+                     city = data_sub$city[-sample],
+                     y_test = y_test,
+                     y_hat = y_hat)
 test_df <- test_df %>% 
   group_by(city) %>% 
   summarize(y_sum_test = sum(y_test),
@@ -212,4 +230,4 @@ accuracy = mean(abs(test_df$y_sum_hat - test_df$y_sum_test) ** 2)
 
 cat('\nBaseline MSE: ', accuracy_baseline * 100)
 cat('\nLogistic MSE: ', accuracy * 100)
-```
+##################################################################

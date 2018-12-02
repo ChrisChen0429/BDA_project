@@ -1,5 +1,5 @@
 ---
-title: "Simple Logistic"
+title: "Logistic Binomial"
 author: "Andres Potapczynski (ap3635)"
 output: pdf_document
 ---
@@ -17,17 +17,16 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r Files, include=FALSE}
 file <-  '../DBs/core.txt'
-# file_model_logistic <- './Models/logistic_gp_v01.stan'
-file_model_logistic <- './Models/logistic_gp_multi_v02.stan'
+file_model <- './Models/binomial_v01.stan'
 ```
 
 ```{r Load the data, include=FALSE}
 data <- read_delim(file = file, delim = '|')
 
 # Sample the data
-# pct = 1
+pct = 1
 # pct = 0.1
-pct = 0.01
+# pct = 0.01
 set.seed(seed = 42)
 sample_size = round(pct * nrow(data))
 sample <- sample(x = nrow(data), size = sample_size, replace = F)
@@ -52,13 +51,33 @@ data_sub <- data %>% dplyr::select(
   y2)
 summary(data_sub)
 
+## Create geographical 
+geo <- data_sub %>% 
+  group_by(city, state) %>% 
+  summarize(market_mean = mean(asset_market_value),
+            appraisal_mean = mean(appraisal_value),
+            income_mean = mean(client_income),
+            mar_2_inc_mean = mean(mar_2_inc),
+            app_2_inc_mean = mean(app_2_inc),
+            mar_2_app_mean = mean(mar_2_app),
+            age_mean = mean(age),
+            y_sum = sum(y),
+            N_state = n()) %>% 
+  ungroup()
+
 
 ## Group data by state and define the IDs
 state_summary <- data_sub %>% 
-  dplyr::select(state) %>% 
+  dplyr::select(state, 
+                client_income, 
+                appraisal_value,
+                asset_market_value) %>% 
   group_by(state) %>% 
-  summarize(n_state = n()) %>% 
-  arrange(desc(n_state)) %>% 
+  summarize(N_state = n(),
+            income_mean_state = mean(client_income),
+            appraisal_mean_state = mean(appraisal_value),
+            market_mean_state = mean(asset_market_value)) %>% 
+  arrange(desc(N_state)) %>% 
   ungroup()
 
 state_summary$ID_state = seq.int(nrow(state_summary))
@@ -74,33 +93,39 @@ city_summary <- data_sub %>%
 city_summary$ID_city = seq.int(nrow(city_summary))
 
 ## Merge back into data
-data_sub <- data_sub %>% 
-  inner_join(y = state_summary[, c('state', 'ID_state')], by = 'state') %>%
-  inner_join(y = city_summary[, c('city', 'ID_city')], by = 'city')
+geo <- geo %>% 
+  inner_join(y = state_summary[, c('state', 'ID_state')], by = 'state')
 ```
 
 ```{r Prep data for STAN model}
 ## Rescaling
-inputs <- data_sub %>%
+inputs <- geo %>%
   mutate(
-    income_st = (log(client_income) - mean(log(client_income))) / sd(log(client_income)),
-    appraisal_st = (log(appraisal_value) - mean(log(appraisal_value))) / sd(log(appraisal_value)),
-    market_st = (log(asset_market_value) - mean(log(asset_market_value))) / sd(log(asset_market_value)),
-    mar_2_inc_st = (mar_2_inc - mean(mar_2_inc)) / sd(mar_2_inc),
-    app_2_inc_st = (app_2_inc - mean(app_2_inc)) / sd(app_2_inc),
-    mar_2_app_st = (mar_2_app - mean(mar_2_app)) / sd(mar_2_app),
-    age_st = (age - mean(age)) / sd(age)
+    
+    income_st = (log(income_mean) - mean(log(income_mean))) /
+      sd(log(income_mean)),
+    
+    appraisal_st = (log(appraisal_mean) - mean(log(appraisal_mean))) /
+      sd(log(appraisal_mean)),
+    
+    market_st = (log(market_mean) - mean(log(market_mean))) /
+      sd(log(market_mean)),
+    
+    mar_2_inc_st = (mar_2_inc_mean - mean(mar_2_inc_mean)) / sd(mar_2_inc_mean),
+    app_2_inc_st = (app_2_inc_mean - mean(app_2_inc_mean)) / sd(app_2_inc_mean),
+    mar_2_app_st = (mar_2_app_mean - mean(mar_2_app_mean)) / sd(mar_2_app_mean),
+    age_st = (age_mean - mean(age_mean)) / sd(age_mean)
          ) %>% 
   dplyr::select(
     income_st,
-    # mar_2_inc_st,
+    mar_2_inc_st,
     appraisal_st,
-    # app_2_inc_st,
-    # mar_2_app_st,
-    # market_st,
+    app_2_inc_st,
+    mar_2_app_st,
+    market_st,
     age_st,
-    y,
-    y2
+    N_state,
+    y_sum
   )
 
 ## Train / Test split
@@ -110,7 +135,7 @@ sample_size = round(pct_train * nrow(inputs))
 sample <- sample(x = nrow(inputs), size = sample_size, replace = F)
 
 ## Allocate train
-y = inputs$y
+y = inputs$y_sum
 
 inputs_train = inputs[sample, ]
 y_train = y[sample]
@@ -126,20 +151,27 @@ data_stan_train <- list(N=nrow(inputs_train),
                         y=y_train)
 
 ## Inputs for STAN
-X_train = inputs_train %>% dplyr::select(-y, -y2)
-X_test = inputs_test %>% dplyr::select(-y, -y2)
+X_train = inputs_train %>% dplyr::select(-y_sum, -N_state)
+X_test = inputs_test %>% dplyr::select(-y_sum, -N_state)
 D = ncol(X_train)
-N = nrow(X_train)
-N1 = nrow(X_train)
-N2 = nrow(X_test)
+N_train = nrow(X_train)
+N_test = nrow(X_test)
+State_N_train = inputs$N_state[sample]
+State_N_test = inputs$N_state[-sample]
 
-data_stan_train = list(N1=N1, N2=N2, D=D, x1=X_train, x2=X_test, z1=y_train)
+data_stan_train = list(N_train=N_train,
+                       N_test=N_test,
+                       State_N_train=State_N_train,
+                       State_N_test=State_N_test,
+                       D=D,
+                       X_train=X_train,
+                       X_test=X_test,
+                       y_train=y_train)
 ```
 
 ```{r Compile the model}
-comp_sm <- stan_model(file_model_logistic)
+comp_sm <- stan_model(file_model)
 ```
-
 
 ```{r Run first STAN model, include=FALSE}
 sm.logistic_v01 = sampling(comp_sm, data=data_stan_train, iter=2000, chains=4)
@@ -147,61 +179,37 @@ sm.logistic_v01 = sampling(comp_sm, data=data_stan_train, iter=2000, chains=4)
 
 ```{r Print resutls of logistic regression, echo=FALSE}
 print(sm.logistic_v01,
-      pars = c('alpha', 'rho'),
+      pars = c('alpha', 'beta'),
       digits = 2, 
       probs = c(0.025, 0.5, 0.975))
 ```
 
 ```{r Extract to evaluate}
 sims <- rstan::extract(sm.logistic_v01)
-proba_hat = apply(X = sims$z2, MARGIN = 2, FUN = mean)
+alpha_median <- median(sims$alpha)
+beta_median <- apply(X = sims$beta, MARGIN = 2, FUN = median)
+y_hat <- apply(X = sims$yrep_test, MARGIN = 2, FUN = mean)
 ```
 
 ```{r Compute test accuracy}
-threshold = 0.1
-
-## Baseline calcs
+## Baseline
 y_hat_baseline <- rep(0, times = length(y_test))
-accuracy_base = sum(y_hat_baseline == y_test) / length(y_test)
-cat('\nBaseline accuracy: ', accuracy_base * 100)
 
-## Prediction calcs
-y_hat = rep(0, times = length(y_test))
-y_hat[proba_hat > threshold] = 1
+RMSE_baseline = sqrt(mean((y_hat_baseline - y_test) ** 2))
+RMSE = sqrt(mean((y_hat - y_test) ** 2))
 
-accuracy = sum(y_hat == y_test) / length(y_test)
-
-cat('\nLogistic accuracy: ', accuracy * 100)
-cat('\nConfusion table\n')
-print(table(y_test, y_hat))
+## Prints
+cat('\nBaseline RMSE: ', RMSE_baseline * 100)
+cat('\nLogistic RMSE: ', RMSE * 100)
 ```
 
 ```{r Predict at the state level}
-test_df = data.frame(ID_state = data_sub$ID_state[-sample],
-                        state = data_sub$state[-sample],
+test_df = data.frame(ID_state = geo$ID_state[-sample],
+                        state = geo$state[-sample],
                         y_test = y_test,
                         y_hat = y_hat)
 test_df <- test_df %>% 
   group_by(state) %>% 
-  summarize(y_sum_test = sum(y_test),
-            y_sum_hat = sum(y_hat)) %>% 
-  arrange(desc(y_sum_test)) %>% 
-  ungroup()
-
-accuracy_baseline = mean(abs(test_df$y_sum_test) ** 2)
-accuracy = mean(abs(test_df$y_sum_hat - test_df$y_sum_test) ** 2)
-
-cat('\nBaseline MSE: ', accuracy_baseline * 100)
-cat('\nLogistic MSE: ', accuracy * 100)
-```
-
-```{r Predict at the city level}
-test_df = data.frame(ID_city = data_sub$ID_city[-sample],
-                        city = data_sub$city[-sample],
-                        y_test = y_test,
-                        y_hat = y_hat)
-test_df <- test_df %>% 
-  group_by(city) %>% 
   summarize(y_sum_test = sum(y_test),
             y_sum_hat = sum(y_hat)) %>% 
   arrange(desc(y_sum_test)) %>% 
