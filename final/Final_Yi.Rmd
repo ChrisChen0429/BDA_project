@@ -19,7 +19,7 @@ Lik what we did in the baseline model. We process by treating the underlying det
 $$ y_i \sim Binormial(n_{i},logit^{-1}(a + x_i\beta)) $$
 As a robust prior distribution option, we take $\beta \sim cauchy(location=0,scale=2.5)$.
 
-In model 2, we will extend this model in two ways: (1) incoperate the geographic state information,(2) hierarchical extension for intercept terms, (3) zero inflated model.  
+In model 2, we will extend this model in two ways: (1) incoperate the geographic state information (2) zero inflated model.  
 
 ### Extension one: Incoperate Geographic Information
 
@@ -49,7 +49,7 @@ In this formula, $det^{*}(A)$ is the generlized determinant of the square matrix
 
 $$  \frac{1}{2}log(\tau^{n-k}) - \frac{1}{2}\phi^{T}\tau(D-W)\phi $$
 
-In  our model, we assume the hyperparameter $\tau \sim Gamma(2,2)$. We define the sparse_iar_lpdf function as a more efficient spare representation as the following:
+In  our model, we assume the hyperparameter $\tau \sim Gamma(shape = 2,rate = 2)$. We define the sparse_iar_lpdf function as a more efficient spare representation as the following:
 
 ```{r eval=FALSE}
 functions {
@@ -73,29 +73,22 @@ functions {
 
 After we get the IAR prior, we can take it into our model.For the $i$ the city in the $j$ the state, we have:
 
-$$ y_{ij} \sim Binormial(n_{ij},logit^{-1}(a + \phi_i + x_i\beta)) $$
+$$ y_{ij} \sim Binormial(n_{ij},logit^{-1}(a + \phi_j + x_{ij}\beta)) $$
+* Reason for design the model in this way rather than hierarchical model:
 
+1. Hierarchical extension will greatly expend the demension of the parameter space. Consequently, the estimation convergence would be much more difficult.Just focus on the binormial regression part. If we take the hierarchical extension both on the intercept and coefficient terms, there will have $32 \times 1 = 32$ intercept paramters and $32 \times 7 = 224$ coefficient parameters (total 256 parameters).For taking  the hierarchical extension on  $\beta$s, we have 1 intercept and $7 \times 32 = 224$ coefficient in the binormial regression model (total 225 parameters). But now, we only have 1 parameter for overall intercept, 32 parameter for the state level effecr and 7 parameter for the different independent variables' effects.
 
-### Extension two: Hierarchical extension for intercept terms
+2. This design of model is better for interpreation and better for us to solve our research problems.Now the coefficient terms are not depend on the state prior. Thus, we can estimate the overall effect from these independent variables, like age and income. And on the state level effect, we can have the overall idea based on the estimated parameter values.
 
-In our model, we let the intercept term $a$ in our model base on the IAR prior $\phi$. At the same time, we take the cauchy distribution to let the model to be more robust. Since the a is the intercept term in the binormail regression. We assume the scale to be 10.  For the $j$ th city in the $i$ the state, we have:
-
-$$a_{ij} \sim cauchy(location=\phi_i,scale= 10)$$
-In this way, $a$ is the state-level effect which represent the overall effects from the factors we have not taken as independent variables. There are two resons we do not take the hierarchical extension for the coefficient terms.
-
-1. Hierarchical extension for the $\beta$s will greatly expend the demension of the parameter space. Originally, we have 1 intercept and 7 coefficient in the binormial regression model (total 8 parameters). If we take the hierarchical extension both on the intercept and coefficient terms, there will have $32 \times 1 = 32$ intercept paramters and $32 \times 7 = 224$ coefficient parameters (total 256 parameters). Now, we have$32 \times 1 = 32$ intercept paramters and 7 coefficient parameters (total 39 parameters). This is more acceptable.
-
-2. Now the coefficient terms are not depend on the state prior. Thus, we can estimate the overall effect from these independent variables, like age and income.
-
-### Extension three: zero inflated model
+### Extension two: zero inflated model
 
 Zero-inflated model originally provide mixture of a mixtures of a Poisson and Bernoulli probability mass function to allow more flexibility in modeling the probability of a zero outcome. Zero-inflated models, as defined by Lambert (1992), add additional probability mass to the outcome of zero. But, this extension can also be applied for other categorical distributions like binomial distribution we used in this project. 
 
-We assume a parameter $\theta$ as the probability of drawing a zero and the probability $1-\theta$ as drawing fro mthe Binormal distribution. The distribution function is thus:
+We assume a parameter $\theta$ as the probability of drawing a zero and the probability $1-\theta$ as drawing fro mthe Binormal distribution. The prior distribution of  $\theta$ is uniform between 0 and 1, since we have no extra information about this parameter. The distribution function is thus:
 
 $$p(y_n | \theta,a,\beta) =\begin{cases} 
-\theta + (1-\theta) \times Binomial(0 |a,\beta ) & y_n =0 \\
-(1-\theta) \times Binomial(0 |a,\beta )  & y_n > 0 \end{cases}$$
+\theta + (1-\theta) \times Binomial(0 |a,\beta,\phi ) & y_n =0 \\
+(1-\theta) \times Binomial(0 |a,\beta,\phi )  & y_n > 0 \end{cases}$$
 
 In stan, we estimate the model in this following ways:
 
@@ -109,7 +102,7 @@ for (j in 1:N_train){
   }
 ```
 
-And we predict the $y_rep$ in the following way:
+And we predict the $y_{rep}$ in the following way:
 
 ```{r eval=FALSE}
 generated quantities{
@@ -131,6 +124,7 @@ generated quantities{
 ### Model Coveage testing wit fake data.
 
 In this part, we first simulate the fake data as we assume in thie model. Then, we will check that our model works well with the data that we have simulated ourselves. In this following are the model coverage plots.
+
 
 
 
@@ -170,7 +164,7 @@ generated quantities{
 ```
 
 
-And it shows that the cross validation for model 2 is : **10020**. 
+Acrroding to the result, the baseline MSE is 128164. But for our model, the average MSE is **7583** with the standard deviation **6831**. Thus, we can say that our model have a huge improve from the baseline.
 
 
 
@@ -466,8 +460,8 @@ for (i in 1:5){
 ```{r eval=FALSE, include=FALSE}
 MSE <- c()
 for (i in 1:5){
-  name = paste('model2_cv',str(i),'.rds')
-  fit <- readRDS(file = name)
+  name = paste('model2_cv',as.character(i),'.rds',sep = "")
+  fit1 <- readRDS(file = name)
   sims <- rstan::extract(fit1)
   y_hat <- apply(X = sims$y_rep_cv, MARGIN = 2, FUN = median)  
   
@@ -515,11 +509,59 @@ saveRDS(fit2, file = "model2_full.rds")
 
 
 ```{r}
-# fake data simulation
+## simulate the fake data
+library(matlib)
+set.seed(1234)
+S = length(unique(data_sub$state))
+n_city_train = inputs$n_city
+X_train = inputs %>% dplyr::select(-ID_state,-n_city,-sum_y, -sum_y2)
+N_train = nrow(X_train)
+D = ncol(X_train)
+state_train = inputs$ID_state
+tau <- rgamma(n=1,shape = 2,rate = 2)
+D <- diag(colSums(A))
+W <- A
+theta <- runif(n=1,min = 0,max = 1)
+sigma <- tau * inv(D - W)
+phi <- mvrnorm(n=1, mu = rep(0,32), Sigma = sigma )
+beta <- rcauchy(n=7,location = 0,scale = 2.5)
+alpha <- rcauchy(n=1,location = 0,scale = 10)
+y <- c()
+for (i in N_train){
+  zero_d <- runif(n=1,min = 0,max = 1)
+  
+  if (zero_d < theta){
+    new_y <- 0
+  }else{
+    prob <- invlogit(alpha + phi[state_train[i]] + X_train[i,] * beta)
+    new_y <-rbinom(n=1,size = n_city,prob = prob)   
+  }  
+  y <- c(y,new_y)
+}
+fake_data = list(S=S,N_train=N_train, D=D,
+                   state_train = state_train,
+                    X_train=X_train, W = A,W_n = sum(A) / 2,
+                    n_city_train = n_city_train, 
+                     y = y)
 
+## fit the model with the fake data
+fake_fit <- sampling(model2_full, data=fake_data,seed=1234)
+
+## test the recoverage
+sim_fake <- rstan::extract(fake_fit)
+true_phi <- phi
+posterior_phi <- as.matrix(sim_fake, pars = c('phi'))
+true_beta <- beta
+posterior_beta <- as.matrix(sim_fake, pars = c('beta'))
+true_alpha_tau_theta <- c(alpha,tau,theta)
+posterior_alpha_tau_theta <- as.matrix(sim_fake, pars = c('alpha','tau','theta'))
 ```
 
-
+```{r}
+mcmc_recover_hist(posterior_phi, true = true_phi)
+mcmc_recover_hist(posterior_beta, true = true_beta)
+mcmc_recover_hist(posterior_alpha_tau_theta, true = true_alpha_tau_theta)
+```
 
 
 
