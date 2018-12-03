@@ -38,7 +38,8 @@ In this formula, we have:
 We can simplifies the IAR model to:
 
 $$\phi \sim N(0,\tau (D-W)]^{-1})$$
-In IAR model, we have a singular precision matrix and an improper prior distribution. However, in practice, IAR models are fit with a sum to zero constrains: $\sum_{i} \phi_i = 0 $ for each connected component of the graph. In this way, we can interpret both overall means and the component-wise means.
+In IAR model, we have a singular precision matrix and an improper prior distribution. However, in practice, IAR models are fit with a sum to zero constrains: 
+$\sum_{i}\phi_i = 0$ for each connected component of the graph. In this way, we can interpret both overall means and the component-wise means.
 
 Through log probability accumulator, we can accure computational efficiency gains. We have:
 
