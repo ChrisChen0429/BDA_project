@@ -126,14 +126,14 @@ generated quantities{
 In this part, we first simulate the fake data as we assume in thie model. Then, we will check that our model works well with the data that we have simulated ourselves. In this following are the model coverage plots.
 
 We now assessing the parameter recoverage of $\beta$ parameters.
-
+![](./pic/Rplot01.png)
 
 In the plot plot is the parameter recoverage of $\phi$ parameters.
-
+![](./pic/Rplot.png)
 Finally, let's check the parameter recoverage of $\alpha,\theta,\tau$
+![](./pic/Rplot02.png)
 
-
-
+As we can see, all the parameters in our fake data recover very well. This means it is reliable to use rstan to run this model.
 
 
 ### Model Check
