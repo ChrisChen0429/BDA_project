@@ -133,6 +133,9 @@ In the plot plot is the parameter recoverage of $\phi$ parameters.
 Finally, let's check the parameter recoverage of $\alpha,\theta,\tau$
 
 
+
+
+
 ### Model Check
 
 ##### Posterior Predict Check (PPC) 
