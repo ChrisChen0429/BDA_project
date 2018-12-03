@@ -17,8 +17,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r Files, include=FALSE}
 file <-  '../DBs/core.txt'
-# file_model <- './Models/binomial_state_v01.stan'
-file_model <- './Models/binomial_state_v04.stan'
+file_model <- './Models/binomial_state_v01.stan'
+# file_model <- './Models/binomial_state_v04.stan'
 SEED = 1234
 SEED_TRAIN = 81989843
 CHAINS = 8
