@@ -129,6 +129,10 @@ In this part, we first simulate the fake data as we assume in thie model. Then, 
 
 
 
+
+
+
+
 ### Model result
 
 In the following is the basic model results:
@@ -142,7 +146,7 @@ In the following is the basic model results:
 
 ### Model summary
 
-In order to determine our model performance, again we do the cross validation. And we calculate the MSE for our model. The stan code we used to simulate the $y_hat$ is as the following:
+In order to determine our model performance, again we do the 5-floder cross validation. And we calculate the MSE for each training dataset with our model. And then we get the average MSE. The stan code we used to simulate the $y_hat$ is as the following:
 
 ```{r eval=FALSE}
 generated quantities{
