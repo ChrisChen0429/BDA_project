@@ -403,7 +403,7 @@ $(document).ready(function () {
 </div>
 <div id="model-summary" class="section level3">
 <h3>Model summary</h3>
-<p>In order to determine our model performance, again we do the cross validation. And we calculate the MSE for our model. The stan code we used to simulate the <span class="math inline">\(y_hat\)</span> is as the following:</p>
+<p>In order to determine our model performance, again we do the 5-floder cross validation. And we calculate the MSE for each training dataset with our model. And then we get the average MSE. The stan code we used to simulate the <span class="math inline">\(y_hat\)</span> is as the following:</p>
 <pre class="r"><code>generated quantities{
   int y_rep_cv[N_test];
   real&lt;lower =0,upper=1&gt; zero_test[N_test];
@@ -417,7 +417,7 @@ $(document).ready(function () {
       }
   }
 }</code></pre>
-<p>And it shows that the cross validation for model 2 is : ** **.</p>
+<p>And it shows that the cross validation for model 2 is : <strong>10020</strong>.</p>
 </div>
 </div>
 

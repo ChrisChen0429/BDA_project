@@ -61,7 +61,7 @@ parameters {
   vector[S] phi_unscaled;
   real<lower = 0> tau;
   real<lower=0, upper=1> theta;                  // probability of draw a zero
-  vector[S] alpha;
+  real alpha;
 }
 
 transformed parameters {
@@ -73,16 +73,13 @@ model {
   tau ~ gamma(2, 2);
   phi_unscaled ~ sparse_iar(tau, W_sparse, D_sparse, lambda, S, W_n);
   beta ~ cauchy(0, 2.5);
-  
-  for (i in 1:S){
-    alpha[i] ~ cauchy(phi[i],10);
-  }
+  alpha ~ cauchy(0, 10);
   for (j in 1:N_train){
     if (y[j] == 0){
-      target += log_sum_exp(bernoulli_lpmf(1 | theta), bernoulli_lpmf(0 | theta) + binomial_logit_lpmf(y[j] | n_city_train[j],alpha[state_train[j]] + X_train[j,]* beta));
+      target += log_sum_exp(bernoulli_lpmf(1 | theta), bernoulli_lpmf(0 | theta) + binomial_logit_lpmf(y[j] | n_city_train[j],alpha + phi[state_train[j]] + X_train[j,] * beta));
       }
     else{
-      target += bernoulli_lpmf(0 | theta) + binomial_logit_lpmf(y[j] | n_city_train[j],alpha + X_train[j,] * beta);}
+      target += bernoulli_lpmf(0 | theta) + binomial_logit_lpmf(y[j] | n_city_train[j],alpha + phi[state_train[j]] + X_train[j,] * beta);}
   }
 }
 generated quantities{
@@ -94,7 +91,7 @@ generated quantities{
       y_rep[i] = 0;
       }
     else{
-      y_rep[i] = binomial_rng(n_city_train[i],inv_logit(alpha[state_train[i]] + X_train[i,]* beta));
+      y_rep[i] = binomial_rng(n_city_train[i],inv_logit(alpha + phi[state_train[i]] + X_train[i,] * beta));
       }
   }
 }

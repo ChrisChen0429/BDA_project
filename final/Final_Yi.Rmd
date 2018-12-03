@@ -420,11 +420,11 @@ splited_inputs <- split(inputs, sample(rep(1:5, 176)))
 
 for (i in 1:5){
   a <- c(1,2,3,4,5)[-i]
-  input_test = splited_inputs[[i]]
-  input_train = rbind(splited_inputs[[a[1]]] ,splited_inputs[[a[2]]],splited_inputs[[a[3]]],splited_inputs[[a[4]]]) 
+  inputs_test = splited_inputs[[i]]
+  inputs_train = rbind(splited_inputs[[a[1]]] ,splited_inputs[[a[2]]],splited_inputs[[a[3]]],splited_inputs[[a[4]]]) 
 
-  y_train = input_train$sum_y
-  y_test = input_test$sum_y
+  y_train = inputs_train$sum_y
+  y_test = inputs_test$sum_y
 
 ## Inputs for STAN
   n_city_train = inputs_train$n_city
@@ -481,6 +481,7 @@ for (i in 1:5){
   MSE <- c(MSE,accuracy * 100)
 }
 average_MSE <- mean(MSE)
+#sd
 ```
 
 
@@ -504,6 +505,7 @@ model2_data = list(S=S,N_train=N_train, D=D,
                      y = y_train)
 model2_full = stan_model('model2_full.stan')
 fit2 <- sampling(model2_full, data=model2_data,seed=1234)
+saveRDS(fit2, file = "model2_full.rds")
 ```
 
 
