@@ -16,7 +16,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Lik what we did in the baseline model. We process by treating the underlying deterministic model as providing an expected default times for each city around which there will be variation due to both measurement error and simplifications. Consider the typical formulation of a linear regression, where $y_n$ is the is an observable default time, $x_n$ is a row vector of unmodeled predictors ( independent variables), $\beta$ is a coefficient vector parameter and we separate the intercep as $a$. In the city level, we assume that the number of individual records in city $i$ is $n_i$.Thus, we have the model:
 
-$$ y_i \sim Binormial(n_{i},a + x_i\beta) $$
+$$ y_i \sim Binormial(n_{i},logit^{-1}(a + x_i\beta)) $$
 As a robust prior distribution option, we take $\beta \sim cauchy(location=0,scale=2.5)$.
 
 In model 2, we will extend this model in two ways: (1) incoperate the geographic state information,(2) hierarchical extension for intercept terms, (3) zero inflated model.  
@@ -70,6 +70,11 @@ functions {
   }
 }
 ```
+
+After we get the IAR prior, we can take it into our model.For the $i$ the city in the $j$ the state, we have:
+
+$$ y_{ij} \sim Binormial(n_{ij},logit^{-1}(a + \phi_i + x_i\beta)) $$
+
 
 ### Extension two: Hierarchical extension for intercept terms
 
@@ -449,7 +454,7 @@ for (i in 1:5){
                      n_city_test = n_city_test,
                      y = y_train)
   fit2 <- sampling(model2, data=model2_data,seed=1234)
-  name = paste('model2_cv',str(i),'.rds')
+  name = paste('model2_cv',as.character(i),'.rds',sep = "")
   saveRDS(fit2, file = name)
 }
 
@@ -476,12 +481,12 @@ for (i in 1:5){
     arrange(desc(y_sum_test)) %>% 
     ungroup()
   
-  accuracy_baseline = mean(abs(test_df$y_sum_test) ** 2)
-  accuracy = mean(abs(test_df$y_sum_hat - test_df$y_sum_test) ** 2)
-  MSE <- c(MSE,accuracy * 100)
+  mse_baseline = mean((test_df$y_sum_test) ** 2)
+  mse = mean((test_df$y_sum_hat - test_df$y_sum_test) ** 2)
+  MSE <- c(MSE,mse)
 }
 average_MSE <- mean(MSE)
-#sd
+SD_MSE <- sd(MSE)
 ```
 
 
@@ -509,6 +514,10 @@ saveRDS(fit2, file = "model2_full.rds")
 ```
 
 
+```{r}
+# fake data simulation
+
+```
 
 
 
