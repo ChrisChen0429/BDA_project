@@ -106,11 +106,41 @@ city_df = data.groupby(by=['city', 'state']).agg({'y': np.ma.count})
 city_df = city_df.reset_index()
 city_df = city_df.rename(columns={'y': 'city_n'})
 
-state_df = data.groupby(by=['state']).agg({'y': np.ma.count})
+agg_dict_state = {
+    'client_income': log_mean,
+    'asset_market_value': log_mean,
+    'appraisal_value': log_mean,
+    'age': np.mean,
+    'sex_F': np.mean,
+    'condition_U': np.mean,
+    'risk_index': np.mean,
+    'ratio': np.mean,
+    'vendor_Y': np.mean,
+    'employed_30': np.mean,
+    'lender_score': np.mean,
+    'y': np.ma.count
+}
+
+rename_dict_state = {
+    'client_income': 'income_state',
+    'asset_market_value': 'market_state',
+    'appraisal_value': 'appraisal_state',
+    'age': 'age_state',
+    'sex_F': 'sex_state',
+    'condition_U': 'new_state',
+    'risk_index': 'risk_state',
+    'ratio': 'ratio_state',
+    'vendor_Y': 'vendor_state',
+    'employed_30': 'employed_state',
+    'lender_score': 'lender_state',
+    'y': 'state_n',
+    'index': 'ID_state'
+}
+
+state_df = data.groupby(by=['state']).agg(agg_dict_state)
 state_df = state_df.reset_index()
 state_df = state_df.reset_index()
-state_df = state_df.rename(columns={'y': 'state_n',
-                                    'index': 'ID_state'})
+state_df = state_df.rename(columns=rename_dict_state)
 
 city_df = pd.merge(left=city_df,
                    right=state_df,
