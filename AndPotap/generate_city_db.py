@@ -72,7 +72,8 @@ data = data_all[selected_columns]
 
 
 def log_mean(x):
-    return np.mean(np.log(x))
+    # return np.mean(np.log(x))
+    return np.log(np.mean(x))
 
 
 agg_dict = {
