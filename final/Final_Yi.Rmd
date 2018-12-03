@@ -161,7 +161,7 @@ generated quantities{
 ```
 
 
-And it shows that the cross validation for model 2 is : ** **. 
+And it shows that the cross validation for model 2 is : **10020**. 
 
 
 
@@ -405,88 +405,102 @@ inputs <- city_summary %>%
     sum_y2
   )
 
+```
 
+```{r}
 ## Train / Test split
-set.seed(seed = 81989843)
-pct_train = 0.8
-sample_size = round(pct_train * nrow(inputs))
-sample <- sample(x = nrow(inputs), size = sample_size, replace = F)
+set.seed(1234)
+model2 = stan_model('Model2.stan')
 
-## Allocate train
-y = inputs$sum_y
-y2 = inputs$sum_y2
+splited_inputs <- split(inputs, sample(rep(1:5, 176)))
 
-inputs_train = inputs[sample, ]
-y_train = y[sample]
+for (i in 1:5){
+  a <- c(1,2,3,4,5)[-i]
+  input_test = splited_inputs[[i]]
+  input_train = rbind(splited_inputs[[a[1]]] ,splited_inputs[[a[2]]],splited_inputs[[a[3]]],splited_inputs[[a[4]]]) 
 
-## Allocate test
-inputs_test = inputs[-sample, ]
-y_test = y[-sample]
+  y_train = input_train$sum_y
+  y_test = input_test$sum_y
 
 ## Inputs for STAN
-n_city_train = inputs_train$n_city
-n_city_test = inputs_test$n_city
+  n_city_train = inputs_train$n_city
+  n_city_test = inputs_test$n_city
 
 
-X_train = inputs_train %>% dplyr::select(-ID_state,-n_city,-sum_y, -sum_y2)
-X_test = inputs_test %>% dplyr::select(-ID_state,-n_city,-sum_y, -sum_y2)
+  X_train = inputs_train %>% dplyr::select(-ID_state,-n_city,-sum_y, -sum_y2)
+  X_test = inputs_test %>% dplyr::select(-ID_state,-n_city,-sum_y, -sum_y2)
 
-N_train = nrow(X_train)
-N_test = nrow(X_test)
+  N_train = nrow(X_train)
+  N_test = nrow(X_test)
 
-D = ncol(X_train)
-S = length(unique(data_sub$state))
-state_train = inputs_train$ID_state
-state_test = inputs_test$ID_state
+  D = ncol(X_train)
+  S = length(unique(data_sub$state))
+  state_train = inputs_train$ID_state
+  state_test = inputs_test$ID_state
 
-model2_data = list(S=S,N_train=N_train, N_test=N_test, D=D,state_train = state_train,state_test = state_test,
+  model2_data = list(S=S,N_train=N_train, N_test=N_test, D=D,
+                   state_train = state_train,state_test = state_test,
                   X_train=X_train, X_test=X_test,W = A,W_n = sum(A) / 2,
                   n_city_train = n_city_train, 
                      n_city_test = n_city_test,
                      y = y_train)
+  fit2 <- sampling(model2, data=model2_data,seed=1234)
+  name = paste('model2_cv',str(i),'.rds')
+  saveRDS(fit2, file = name)
+}
+
+```
+
+
+
+
+```{r eval=FALSE, include=FALSE}
+MSE <- c()
+for (i in 1:5){
+  name = paste('model2_cv',str(i),'.rds')
+  fit <- readRDS(file = name)
+  sims <- rstan::extract(fit1)
+  y_hat <- apply(X = sims$y_rep_cv, MARGIN = 2, FUN = median)  
+  
+  test_df = data.frame(ID_state = inputs_test$ID_state,
+                       y_test = y_test,
+                       y_hat = y_hat)
+  
+  test_df <- test_df %>% 
+    summarize(y_sum_test = sum(y_test),
+              y_sum_hat = sum(y_hat)) %>% 
+    arrange(desc(y_sum_test)) %>% 
+    ungroup()
+  
+  accuracy_baseline = mean(abs(test_df$y_sum_test) ** 2)
+  accuracy = mean(abs(test_df$y_sum_hat - test_df$y_sum_test) ** 2)
+  MSE <- c(MSE,accuracy * 100)
+}
+average_MSE <- mean(MSE)
 ```
 
 
 
 ```{r eval=FALSE, message=FALSE, warning=FALSE, include=FALSE, results='hide'}
-model2 = stan_model('Model2.stan')
-fit2 <- sampling(model2, data=model2_data,seed=1234)
+## Allocate train
+y_train = inputs$sum_y
+
+## Inputs for STAN
+n_city_train = inputs$n_city
+X_train = inputs %>% dplyr::select(-ID_state,-n_city,-sum_y, -sum_y2)
+
+N_train = nrow(X_train)
+D = ncol(X_train)
+S = length(unique(data_sub$state))
+state_train = inputs$ID_state
+model2_data = list(S=S,N_train=N_train, D=D,
+                   state_train = state_train,
+                    X_train=X_train, W = A,W_n = sum(A) / 2,
+                    n_city_train = n_city_train, 
+                     y = y_train)
+model2_full = stan_model('model2_full.stan')
+fit2 <- sampling(model2_full, data=model2_data,seed=1234)
 ```
-
-
-```{r eval=FALSE, include=FALSE}
-sims <- rstan::extract(fit1)
-# a_median <- median(sims$a)
-# beta_median <- apply(X = sims$beta, MARGIN = 2, FUN = median)
-# 
-# y_hat <- N_test * invlogit(a_median + as.matrix(X_test)%*%beta_median)
-
-# mode <- function(x) {
-#   ux <- unique(x)
-#   ux[which.max(tabulate(match(x, ux)))]
-# }
-
-y_hat <- apply(X = sims$y_rep_cv, MARGIN = 2, FUN = median)  
-
-test_df = data.frame(ID_state = inputs_test$ID_state,
-                     y_test = y_test,
-                     y_hat = y_hat)
-
-test_df <- test_df %>% 
-  summarize(y_sum_test = sum(y_test),
-            y_sum_hat = sum(y_hat)) %>% 
-  arrange(desc(y_sum_test)) %>% 
-  ungroup()
-
-accuracy_baseline = mean(abs(test_df$y_sum_test) ** 2)
-accuracy = mean(abs(test_df$y_sum_hat - test_df$y_sum_test) ** 2)
-cat('\nBaseline MSE: ', accuracy_baseline * 100)
-cat('\nLogistic MSE: ', accuracy * 100)
-```
-
-
-
-
 
 
 

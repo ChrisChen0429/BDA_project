@@ -19,17 +19,13 @@ functions {
 data {
   int<lower = 1> S;                     // number of state
   int<lower = 1> N_train;               // number of record of train set
-  int<lower = 1> N_test;                // number of record of test set
   int<lower = 1> D;                     // number of non-geo parameter
   matrix[N_train, D] X_train;           // raw design matrix for train set
-  matrix[N_test, D] X_test;             // raw design matrix for train set
   int<lower = 0> y[N_train];            // response for train set
   int<lower=1> state_train[N_train];    // state indicator for train set
-  int<lower=1> state_test[N_test];      // state indicator for test set
   matrix<lower = 0, upper = 1>[S, S] W; // adjacency matrix
   int W_n;                              // number of adjacent region pairs
   int<lower=1> n_city_train[N_train];   // number of record for city k in training set
-  int<lower=1> n_city_test[N_test];     // number of record for city k in testing set
 }
 
 transformed data {
@@ -90,15 +86,15 @@ model {
   }
 }
 generated quantities{
-  int y_rep_cv[N_test];
-  real<lower =0,upper=1> zero_test[N_test];
-  for (i in 1:N_test){
-    zero_test[i] = uniform_rng(0,1);
-    if (zero_test[i] < theta){
-      y_rep_cv[i] = 0;
+  int y_rep[N_train];
+  real<lower =0,upper=1> zero_train[N_train];
+  for (i in 1:N_train){
+    zero_train[i] = uniform_rng(0,1);
+    if (zero_train[i] < theta){
+      y_rep[i] = 0;
       }
     else{
-      y_rep_cv[i] = binomial_rng(n_city_test[i],inv_logit( alpha[state_test[i]] + X_test[i,]* beta));
+      y_rep[i] = binomial_rng(n_city_train[i],inv_logit(alpha[state_train[i]] + X_train[i,]* beta));
       }
   }
 }
