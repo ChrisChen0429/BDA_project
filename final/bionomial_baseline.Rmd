@@ -141,57 +141,22 @@ inputs <- city_summary %>%
   )
 
 
-## Train / Test split
-set.seed(seed = 1234)
-pct_train = 0.8
-sample_size = round(pct_train * nrow(inputs))
-sample <- sample(x = nrow(inputs), size = sample_size, replace = F)
-
-## Allocate train
-y = inputs$sum_y
-y2 = inputs$sum_y2
-
-inputs_train = inputs[sample, ]
-y_train = y[sample]
-
-## Allocate test
-inputs_test = inputs[-sample, ]
-y_test = y[-sample]
-
-
-## Inputs for STAN
-X_train = inputs_train %>% dplyr::select(-ID_state,-n_city,-sum_y, -sum_y2)
-X_test = inputs_test %>% dplyr::select(-ID_state,-n_city,-sum_y, -sum_y2)
-
-N_train = nrow(X_train)
-N_test = nrow(X_test)
-
-n_city_train = inputs_train$n_city
-n_city_test = inputs_test$n_city
-
-D = ncol(X_train)
-
-baseline_data = list(N_train=N_train, N_test=N_test, D=D, 
-                     X_train=X_train, X_test=X_test,
-                     n_city_train = n_city_train, 
-                     n_city_test = n_city_test,
-                     y_train = y_train)
 ```
 
 
 ## Baseline Model: Binomial 
 
 Our baseline model is binomial. We give cauchy priors on the coefficient parameter $\beta$ the intercept $a$.
-In the city level, we assume that the number of individual records in city $c$ is $n_c$.
+In the city level, we assume that the number of individual records in city $i$ is $n_i$.
 $$
-a \sim \mathsf{Cauchy}(0, 10)
+a \sim \mathsf{Cauchy}(0, \; 10)
 $$
 $$
-\beta \sim \mathsf{Cauchy}(0, 2.5)
+\beta \sim \mathsf{Cauchy}(0, \; 2.5)
 $$
 
 $$
-y_{c} \sim \mathsf{Binomial} (N_{c}, \; logit^{-1}(a + \beta \cdot X_{c}))
+y_{i} \sim \mathsf{Binomial} (n_{i}, \; logit^{-1}(a + \beta \cdot X_{i}))
 $$
 
 The binomial baseline model is given by:
@@ -205,28 +170,37 @@ We generate the fake data to simulate the model.
 ```{r}
 a <- rcauchy(1, 0, 10)
 beta <- rcauchy(7, 0, 2.5)
+X <- inputs %>% dplyr::select(-ID_state,-n_city,-sum_y, -sum_y2)
+n_city <- inputs$n_city
+N = nrow(X)
+D = ncol(X)
 
 y_fake <- c()
-for (i in 1:N_train){
-  y_fake[i] <- rbinom(1, n_city_train[i], 
-                      invlogit(a + beta %*% as.matrix(X_train)[i,]))
+for (i in 1:N){
+  y_fake[i] <- rbinom(1, n_city[i], 
+                      invlogit(a + beta %*% as.matrix(X)[i,]))
 }
 
-fake_baseline_data <- list(N_train=N_train, N_test=N_test, D=D, 
-                           X_train=X_train, X_test=X_test,
-                           n_city_train = n_city_train, 
-                           n_city_test = n_city_test,
+fake_baseline_data <- list(N_train=N, N_test=N, D=D, 
+                           X_train=X, X_test=X,
+                           n_city_train = n_city, 
+                           n_city_test = n_city,
                            y_train = y_fake)
 ```
 
 ```{r results='hide', warning=FALSE, message=FALSE, cache=TRUE}
 baseline_model_binom=stan_model('binomial_baseline_city.stan')
-fit_fake <- sampling(baseline_model_binom, data=fake_baseline_data, seed=1234)
+fit_fake <- sampling(baseline_model_binom, 
+                     data=fake_baseline_data, seed=1234)
 ```
 
 ```{r}
 print(fit_fake, pars = c('a', 'beta'),
       digits = 2, probs = c(0.025, 0.5, 0.975))
+```
+
+```{r}
+plot(fit_fake)
 ```
 
 ```{r}
@@ -238,10 +212,23 @@ mcmc_recover_hist(sims_fake[, 1:8], true)
 
 
 ### Fit real data
+
 Now we fit the real data with this model.
+
+```{r}
+y = inputs$sum_y
+#y2 = inputs$sum_y2
+
+baseline_data = list(N_train=N, N_test=N, D=D, 
+                     X_train=X, X_test=X,
+                     n_city_train = n_city, 
+                     n_city_test = n_city,
+                     y_train = y)
+```
+
 ```{r results='hide', warning=FALSE, message=FALSE, cache=TRUE}
-#baseline_model_binom=stan_model('binomial_baseline_city.stan')
-fit1 <- sampling(baseline_model_binom, data=baseline_data, seed=1234)
+fit1 <- sampling(baseline_model_binom,
+                 data=baseline_data, seed=1234)
 ```
 
 ```{r}
@@ -253,64 +240,134 @@ print(fit1, pars=c('a', 'beta', 'lp__'),
 ### PPC
 
 ```{r}
-sims <- rstan::extract(fit1)
-y_max <- apply(X = sims$y_rep, MARGIN = 1, FUN = max)
-
-df <- data.frame(y_rep_max = y_max)
-ggplot(df, aes(x=y_rep_max)) +
-  geom_histogram(fill='lightblue',
-                 color='black') +
-  geom_vline(xintercept = max(y), color='red') +
-  ggtitle('max(y_rep)')
-```
-
-```{r STD, message=FALSE, warning=FALSE}
-df <- data.frame(y_rep_sd = apply(X = sims$y_rep, MARGIN = 1, FUN = sd))
-ggplot(df, aes(x=y_rep_sd)) +
-  geom_histogram(fill='lightblue',
-                 color='black') +
-  geom_vline(xintercept = sd(y), color='red') +
-  ggtitle('sd(y_rep)')
+y_rep <- as.matrix(fit1, pars = "y_rep")
+ppc_dens_overlay(y = y, y_rep[1:200,])
 ```
 
 ```{r}
-y_rep <- as.matrix(fit1, pars = "y_rep")
-ppc_dens_overlay(y = y_train, y_rep[1:200,])
+sims <- rstan::extract(fit1)
+
+df <- data.frame(y_rep_mean = apply(X=sims$y_rep, MARGIN = 1, FUN = mean))
+meangg <- ggplot(df, aes(x=y_rep_mean)) +
+  geom_histogram(fill='lightblue', color='black') +
+  geom_vline(xintercept = mean(y), color='red') +
+  ggtitle('mean of y_rep')
+
+df <- data.frame(y_rep_sd = apply(X = sims$y_rep, MARGIN = 1, FUN = sd))
+sdgg <- ggplot(df, aes(x=y_rep_sd)) +
+  geom_histogram(fill='lightblue', color='black') +
+  geom_vline(xintercept = sd(y), color='red') +
+  ggtitle('sd of y_rep')
+
+df <- data.frame(y_rep_max = apply(X = sims$y_rep, MARGIN = 1, FUN = max))
+maxgg <- ggplot(df, aes(x=y_rep_max)) +
+  geom_histogram(fill='lightblue',color='black') +
+  geom_vline(xintercept = max(y), color='red') +
+  ggtitle('max of y_rep')
+
+df <- data.frame(y_rep_min = apply(X = sims$y_rep, MARGIN = 1, FUN = min))
+mingg <- ggplot(df, aes(x=y_rep_min)) +
+  geom_histogram(fill='lightblue',color='black') +
+  geom_vline(xintercept = min(y), color='red') +
+  ggtitle('min of y_rep')
+
+gridExtra::grid.arrange(meangg, sdgg, maxgg, mingg,
+                        layout_matrix = rbind(c(1, 2), 
+                                              c(3, 4)))
+
 ```
 
-```{r echo=FALSE, include=FALSE}
+```{r}
+# Scatterplot of two test statistics
+ppc_scatter_avg(y = y, yrep = y_rep)
+```
+
+```{r echo=FALSE, include=FALSE, eval=FALSE}
+ppc_intervals(y = y, yrep = y_rep, 
+              x = X$income_state_city) + 
+  ggplot2::xlab("Income State City")
+```
+
+```{r echo=FALSE, include=FALSE, eval=FALSE}
 library('shinystan')
 shiny_base = as.shinystan(fit1)
 #launch_shinystan(shiny_base)
 ```
 
-### MSE
+
+### Evaluation (RMSE)
+
+```{r results='hide', warning=FALSE, message=FALSE, cache=TRUE}
+## K fold CV
+set.seed(1234)
+splited_inputs <- split(inputs, sample(rep(1:5, 176)))
+
+for (i in 1:5){
+  a <- c(1,2,3,4,5)[-i]
+  inputs_test = splited_inputs[[i]]
+  inputs_train = rbind(splited_inputs[[a[1]]],
+                  splited_inputs[[a[2]]],
+                  splited_inputs[[a[3]]],
+                  splited_inputs[[a[4]]]) 
+  
+  y_train = inputs_train$sum_y
+  y_test = inputs_test$sum_y
+  
+  ## Inputs for STAN
+  n_city_train = inputs_train$n_city
+  n_city_test = inputs_test$n_city
+  
+  
+  X_train = inputs_train %>% 
+    dplyr::select(-ID_state,-n_city,-sum_y, -sum_y2)
+  X_test = inputs_test %>% 
+    dplyr::select(-ID_state,-n_city,-sum_y, -sum_y2)
+  
+  N_train = nrow(X_train)
+  N_test = nrow(X_test)
+  
+  D = ncol(X_train)
+
+  baseline_data = list(N_train=N_train, N_test=N_test, D=D,
+                       X_train=X_train, X_test=X_test,
+                       n_city_train = n_city_train, 
+                       n_city_test = n_city_test,
+                       y_train = y_train)
+  fit_cv <- sampling(baseline_model_binom, data=baseline_data, seed=1234)
+  name = paste('model1_cv', as.character(i), '.rds', sep = "")
+  saveRDS(fit_cv, file = name)
+}
+
+```
+
 ```{r}
-# a_median <- median(sims$a)
-# beta_median <- apply(X = sims$beta, MARGIN = 2, FUN = median)
-# 
-# y_hat <- N_test * invlogit(a_median + as.matrix(X_test)%*%beta_median)
-# mode <- function(x) {
-#   ux <- unique(x)
-#   ux[which.max(tabulate(match(x, ux)))]
-# }
+rmse <- c()
+for (i in 1:5){
+  name = paste('model1_cv', as.character(i),'.rds',sep = "")
+  fit_cv <- readRDS(file = name)
+  sims_cv <- rstan::extract(fit_cv)
+  y_hat <- apply(X = sims_cv$y_rep_cv, MARGIN = 2, FUN = median)  
+  
+  test_df = data.frame(ID_state = inputs_test$ID_state,
+                       y_test = y_test,
+                       y_hat = y_hat)
+  
+  test_df <- test_df %>% 
+    summarize(y_sum_test = sum(y_test),
+              y_sum_hat = sum(y_hat)) %>% 
+    arrange(desc(y_sum_test)) %>% 
+    ungroup()
+  
+  #mse_baseline = mean((test_df$y_sum_test) ** 2)
+  rmse[i] = sqrt(mean((test_df$y_sum_hat - test_df$y_sum_test) ** 2))
+}
 
-y_hat <- apply(X = sims$y_rep_cv, MARGIN = 2, FUN = median)  
+average_RMSE <- mean(rmse)
+sd_RMSE <- sd(rmse)
 
-test_df = data.frame(ID_state = inputs_test$ID_state,
-                     y_test = y_test,
-                     y_hat = y_hat)
+cat('Model RMSE average: ', average_RMSE)
+cat('Model RMSE standard deviation: ', sd_RMSE)
 
-test_df <- test_df %>% 
-  summarize(y_sum_test = sum(y_test),
-            y_sum_hat = sum(y_hat)) %>% 
-  arrange(desc(y_sum_test)) %>% 
-  ungroup()
-
-accuracy_baseline = mean(abs(test_df$y_sum_test) ** 2)
-accuracy = mean(abs(test_df$y_sum_hat - test_df$y_sum_test) ** 2)
-cat('\nBaseline MSE: ', accuracy_baseline * 100)
-cat('\nLogistic MSE: ', accuracy * 100)
 ```
 
 
