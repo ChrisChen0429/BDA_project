@@ -5,6 +5,8 @@ library(rstan);library(bayesplot);library(loo)
 library(shinystan);library(readr)
 rstan_options(auto_write = TRUE)
 
+
+########## city level analysis
 file <-  '../data/core.txt'
 data <- read_delim(file = file, delim = '|')
 
@@ -85,10 +87,10 @@ city_summary <- city_summary %>%
 
 
 
-N = length(unique(city_summary$state))
+N = length(unique(data$state))
 A <- matrix(0,ncol = N,nrow = N)
-colnames(A) = unique(city_summary$state)
-rownames(A) = unique(city_summary$state)
+colnames(A) = unique(data$state)
+rownames(A) = unique(data$state)
 A['NUEVO LEON',c('ZACATECAS','SAN LUIS POTOSI','TAMAULIPAS','COAHUILA DE ZARAGOZA')] = 1
 A[c('ZACATECAS','SAN LUIS POTOSI','TAMAULIPAS','COAHUILA DE ZARAGOZA'),'NUEVO LEON'] = 1
 A['VERACRUZ LLAVE',c('TAMAULIPAS','SAN LUIS POTOSI','HIDALGO','PUEBLA','OAXACA','CHIAPAS','TABASCO')] = 1
@@ -337,3 +339,47 @@ fit2 <- readRDS(file = "model2_full.rds")
 library(shinystan)
 ss_mod = as.shinystan(fit2)
 launch_shinystan(ss_mod)
+
+
+
+
+########## individual level analysis
+# Sample the data
+pct = 1
+# pct = 0.1
+# pct = 0.01
+set.seed(seed = 42)
+sample_size = round(pct * nrow(data))
+sample <- sample(x = nrow(data), size = sample_size, replace = F)
+data = data[sample, ]
+## Selecting the relevant columns for the analysis
+data_sub <- data %>% dplyr::select(
+  state,
+  asset_market_value,
+  mar_2_app,
+  appraisal_value,
+  app_2_inc,
+  client_income,
+  mar_2_inc,
+  age,
+  y)
+
+state = as.vector(data$state)
+unique_s = unique(state)
+for (i in 1:32){
+  s = as.character(unique_s[i])
+  state[state==s] = as.numeric(i)
+}
+state = as.numeric(state)
+
+y <- data_sub$y
+X <- data_sub %>% dplyr::select(-state,-y)
+X <- scale(X)
+
+individual_data = list(S=32,N=length(y), D=ncol(X),
+                   state = state,
+                   X=X, W = A,W_n = sum(A) / 2,
+                   y = y)
+model2_full = stan_model('model2_individual.stan')
+fit2 <- sampling(model2_full, data=individual_data,seed=1234)
+

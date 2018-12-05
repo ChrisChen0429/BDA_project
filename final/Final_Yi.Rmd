@@ -250,11 +250,17 @@ The state effects are obvious. We can see that $\phi_3$ (QUERETARO DE ARTEAGA), 
 As we can see, the overall offset effect is obvious that for about -2.67. And on avrage, there will have 1% of cities have no default at all. On 95% confidence interval, there will have less than 3% of cities have no default.
 
 
+## Model discussions Individual level Analysis
 
+In the past chapters, we focus on the city level analysis. In this way, we simplified our data set and clearified our model design ideas. More importantly, it saves a lot of time to run this model in city level. However, in reality, people may also interested in the individual default risk. Besides, some independent variables like average age is not make so much sense.
 
+In this chapter, we will instead run the model for the individual level. For individual level, it's more resonable to use the logistic regression instead of the binormial regression. However, the CAR and zero-inflated model extension still can be used.
 
-
-
+Thus, the new model for individual level can be summarized as these:
+$$ y_{ij} \sim bernoulli(logit^{-1}(a + \phi_j + x_{ij}\beta)) $$
+$$p(y_n | \theta,a,\beta) =\begin{cases} 
+\theta + (1-\theta) \times bernoulli(0 |a,\beta,\phi ) & y_n =0 \\
+(1-\theta) \times bernoulli(0 |a,\beta,\phi )  & y_n > 0 \end{cases}$$
 
 
 
