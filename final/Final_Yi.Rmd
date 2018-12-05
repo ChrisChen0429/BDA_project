@@ -250,7 +250,7 @@ The state effects are obvious. We can see that $\phi_3$ (QUERETARO DE ARTEAGA), 
 As we can see, the overall offset effect is obvious that for about -2.67. And on avrage, there will have 1% of cities have no default at all. On 95% confidence interval, there will have less than 3% of cities have no default.
 
 
-## Model discussions Individual level Analysis
+## Model discussion: Individual level Analysis
 
 In the past chapters, we focus on the city level analysis. In this way, we simplified our data set and clearified our model design ideas. More importantly, it saves a lot of time to run this model in city level. However, in reality, people may also interested in the individual default risk. Besides, some independent variables like average age is not make so much sense.
 

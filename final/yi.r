@@ -380,6 +380,5 @@ individual_data = list(S=32,N=length(y), D=ncol(X),
                    state = state,
                    X=X, W = A,W_n = sum(A) / 2,
                    y = y)
-model2_full = stan_model('model2_individual.stan')
-fit2 <- sampling(model2_full, data=individual_data,seed=1234)
+individual = stan('model2_individual.stan',model2_full, data=individual_data,seed=1234)
 
