@@ -3,7 +3,9 @@ library(MASS);library(tidyr);library(dplyr)
 library(extraDistr);library(gridExtra)
 library(rstan);library(bayesplot);library(loo)
 library(shinystan);library(readr)
+options(mc.cores = parallel::detectCores())
 rstan_options(auto_write = TRUE)
+knitr::opts_chunk$set(echo = TRUE)
 
 
 ########## city level analysis
@@ -380,5 +382,5 @@ individual_data = list(S=32,N=length(y), D=ncol(X),
                    state = state,
                    X=X, W = A,W_n = sum(A) / 2,
                    y = y)
-individual = stan('model2_individual.stan',model2_full, data=individual_data,seed=1234)
+individual = stan('model2_individual.stan', data=individual_data,seed=1234)
 

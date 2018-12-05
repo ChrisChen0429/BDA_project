@@ -1,18 +1,107 @@
 ---
-title: "Final_Yi"
-output: html_document
-date: "`r format(Sys.Date())`"
-editor_options: 
-  chunk_output_type: console
+title: "Final Poject"
+author: "Andres Potapczynski, Jongwoo Choi, Yi Chen"
+date: "28 January 2018"
+output:
+  tufte::tufte_html:
+    toc: true
+    toc_depth: 1
 ---
-
-```{r include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r setup, include=FALSE, echo=FALSE}
+options(htmltools.dir.version = FALSE)
+options(digits = 2)
+library(ggplot2)
+library(gridExtra)
+library(knitr)
+knitr::opts_chunk$set(cache = TRUE)
+knitr::opts_chunk$set(tidy = FALSE, cache.extra = packageVersion('tufte'))
+knitr::opts_chunk$set(comment = "")
+library(reshape)
+library(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores(logical = FALSE))
+library(tufte)
+ggtheme_tufte <- function() {
+  theme(plot.background =
+          element_rect(fill = "#fffff8",
+                       colour = "#fffff8",
+                       size = 0.5,
+                       linetype = "solid"),
+        plot.margin=unit(c(1, 1, 0.5, 0.5), "lines"),
+        panel.background =
+          element_rect(fill = "#fffff8",
+                       colour = "#fffff8",
+                       size = 0.5,
+                       linetype = "solid"),
+        panel.grid.major = element_line(colour = "white", size = 1, linetype="dashed"),
+          # blank(),
+        panel.grid.minor = element_blank(),
+        legend.box.background =
+          element_rect(fill = "#fffff8",
+                       colour = "#fffff8",
+                       linetype = "solid"),
+        axis.ticks = element_blank(),
+        axis.text = element_text(family = "Palatino", size = 16),
+        axis.title.x = element_text(family = "Palatino", size = 20,
+                                    margin = margin(t = 15, r = 0, b = 0, l = 0)),
+        axis.title.y = element_text(family = "Palatino", size = 18,
+                                    margin = margin(t = 0, r = 15, b = 0, l = 0)),
+        strip.background = element_rect(fill = "#fffff8",
+                                        colour = "#fffff8",
+                                        linetype = "solid"),
+        strip.text = element_text(family = "Palatino", size = 16),
+        legend.text = element_text(family = "Palatino", size = 16),
+        legend.title = element_text(family = "Palatino", size = 16,
+                                    margin = margin(b = 5)),
+        legend.background = element_rect(fill = "#fffff8",
+                                        colour = "#fffff8",
+                                        linetype = "solid"),
+        legend.key = element_rect(fill = "#fffff8",
+                                        colour = "#fffff8",
+                                        linetype = "solid")
+  )
+}
+printf <- function(msg = "%5.3f", ...) {
+  cat(sprintf(msg, ...))
+}
 ```
 
-## Model Extension: CAR & Zero Inflation 
 
-### A linear binormial regression analogy
+## Abstract {-}
+
+# Data
+
+## Introduction 
+
+## Explortary Data Analysis
+
+## Data Processin 
+
+The data in our model has been processed the following steps:
+* Take the log of 'client_income' and 'asset_market_value'. 
+
+  Reason: The distribution of these two variables are highly right skewed with high-value outliers.
+* Standardized the design matrix. 
+
+  Reason: Improve the coverage of MCMC. 
+Exclude intercept in the design matrix. Reason: variables are centered and the ICR model has been used.
+
+
+
+
+# Baseline Model : Linear Binormial Regression
+
+
+
+
+
+
+
+
+
+# Model Extension: CAR & Zero Inflation 
+
+## A linear binormial regression analogy
 
 Lik what we did in the baseline model. We process by treating the underlying deterministic model as providing an expected default times for each city around which there will be variation due to both measurement error and simplifications. Consider the typical formulation of a linear regression, where $y_n$ is the is an observable default time, $x_n$ is a row vector of unmodeled predictors ( independent variables), $\beta$ is a coefficient vector parameter and we separate the intercep as $a$. In the city level, we assume that the number of individual records in city $i$ is $n_i$.Thus, we have the model:
 
@@ -81,7 +170,7 @@ $$ y_{ij} \sim Binormial(n_{ij},logit^{-1}(a + \phi_j + x_{ij}\beta)) $$
 
 2. This design of model is better for interpreation and better for us to solve our research problems.Now the coefficient terms are not depend on the state prior. Thus, we can estimate the overall effect from these independent variables, like age and income. And on the state level effect, we can have the overall idea based on the estimated parameter values.
 
-### Extension two: zero inflated model
+## Extension two: zero inflated model
 
 Zero-inflated model originally provide mixture of a mixtures of a Poisson and Bernoulli probability mass function to allow more flexibility in modeling the probability of a zero outcome. Zero-inflated models, as defined by Lambert (1992), add additional probability mass to the outcome of zero. But, this extension can also be applied for other categorical distributions like binomial distribution we used in this project. 
 
@@ -156,7 +245,7 @@ The residuals centered at 0 and have small variance. This indecates that the mod
 
 
 
-##### Cross Validation & MSE
+### Cross Validation & MSE
 
 In order to determine our model performance, again we do the 5-floder cross validation. And we calculate the MSE for each training dataset with our model. And then we get the average MSE. The stan code we used to simulate the $y_hat$ is as the following:
 
@@ -250,17 +339,27 @@ The state effects are obvious. We can see that $\phi_3$ (QUERETARO DE ARTEAGA), 
 As we can see, the overall offset effect is obvious that for about -2.67. And on avrage, there will have 1% of cities have no default at all. On 95% confidence interval, there will have less than 3% of cities have no default.
 
 
+
+# Conclusion
+
+
+
+
+# Exercises and Extensions
 ## Model discussion: Individual level Analysis
 
 In the past chapters, we focus on the city level analysis. In this way, we simplified our data set and clearified our model design ideas. More importantly, it saves a lot of time to run this model in city level. However, in reality, people may also interested in the individual default risk. Besides, some independent variables like average age is not make so much sense.
 
-In this chapter, we will instead run the model for the individual level. For individual level, it's more resonable to use the logistic regression instead of the binormial regression. However, the CAR and zero-inflated model extension still can be used.
-
-Thus, the new model for individual level can be summarized as these:
+In this chapter, we will instead run the model for the individual level. For individual level, it's more resonable to use the logistic regression instead of the binormial regression. 
+$$p(y_i) =\begin{cases} 
+1, & defaule \space at \space least \space once \\
+0, & otherwise \end{cases}$$
+However, the CAR  still can be used.Thus, the new model for individual level can be summarized as these:
 $$ y_{ij} \sim bernoulli(logit^{-1}(a + \phi_j + x_{ij}\beta)) $$
-$$p(y_n | \theta,a,\beta) =\begin{cases} 
-\theta + (1-\theta) \times bernoulli(0 |a,\beta,\phi ) & y_n =0 \\
-(1-\theta) \times bernoulli(0 |a,\beta,\phi )  & y_n > 0 \end{cases}$$
+As the same the zero-inflated model extension will also be applied in the individual level.
+$$p(y_i | \theta,a,\beta) =\begin{cases}  
+\theta + (1-\theta) \times bernoulli(0 |a,\beta,\phi ) & y_i =0 \\
+(1-\theta) \times bernoulli(0 |a,\beta,\phi )  & y_i > 0 \end{cases}$$
 
 The model result is in the following:
 ```{r eval=FALSE}
@@ -269,3 +368,64 @@ The model result is in the following:
 
 ```
 
+## Other Discussion
+
+This case study's idea can be easily applied and extended for realistic applications in several obvious ways. Just like we did in the individual level analysis. There are some other thinking about this case study.
+
+1.  *Simulation-based calibration*.  Write a Stan model to simulate data from this model.  First simulate parameters from the prior (or pick ones consistent with the priors).  Then simulate data from the parameters.  Finally, fit the model in Stan and compare the coverage as in the last plot in the case study.
+
+2.  *Forecasting and backcasting*.  Extend predictions another 50 years into the future and plot as in the last plot.  This can be done by extending the solution points in the transformed parameters, but is more efficiently done in the generated quantities block.  Next, extend the predictions 50 years into the past and plot.
+
+3.  *Missing data*.  Suppose that several of the measurements are missing.  Write a Stan program that uses only the observed measurements.  This will require coding the data in long form.  Only this part of the model changes; the ODE is set up and fit as before with the complete set of time points. What happens to the computation and posterior inferences as increasing amounts of data are missing? How can the missing data points be imputed using the generated quantities block?38
+
+4. *Error model*. Replace the lognormal error with a simple normal error model. What does this do to the z estimates and to the basic parameter estimates? Which error model fits better?
+
+5. *Sensitivity analysis and prior choice*. Perform a sensitivity analysis on the prior choices made for this model. When the prior means or scales are varied, how much does the posterior vary? Does the model become easier or harder to fit (in terms of effective sample size per unit time or divergent transitions) with different prior choices? What does this imply about the number of digits with which we report results and thus the effective sample sizes necessary for most inferences?
+
+6. *Model misspecification*. Swap the coding of the lynx and hare in the input so that the predator is modeled as prey and vice-versa. How well does it fit the data? How does this provide evidence for the folk theorem?
+
+
+
+
+
+## References {-}
+
+* Besag, Julian, Jeremy York, and Annie Mollié. (1991)  Bayesian image restoration, with two applications in spatial statistics. *Annals of the institute of statistical mathematics*, 43.1: 1-20.
+* Gelfand, Alan E., and Penelope Vounatsou. (2003) Proper multivariate conditional autoregressive models for spatial data analysis. *Biostatistics* 4.1: 11-15.
+* Jin, Xiaoping, Bradley P. Carlin, and Sudipto Banerjee. (2005) Generalized hierarchical multivariate CAR models for areal data. *Biometrics*  61.4: 950-961.
+* Bob Carpenter. (2018) [Predator-Prey Population Dynamics: 
+the Lotka-Volterra model in Stan](http://mc-stan.org/users/documentation/case-studies/lotka-volterra-predator-prey.html#data-lynx-and-hare-pelts-in-canada). *Rstan Document For Example*.
+* Max Joseph. (2011) [Exact sparse CAR models in Stan](http://mc-stan.org/users/documentation/case-studies/mbjoseph-CARStan.html). *Rstan Document For Example*.
+* Stan Development Team (2017) *Stan Modeling Language Users Guide and Reference Manual*, Version 2.17, [http://mc-stan.org](http://mc-stan.org).
+* Vehtari, A., Gelman, A. & Gabry, J. (2017) Practical Bayesian model evaluation using leave-one-out cross-validation and WAIC.   *Journal of Statistics and Computing* 27(5):1413--1432.
+* Andrew Gelman, John B. Carlin, Hal S. Stern, David B. Dunson, Aki Vehtari, Donald B. Rubin (2014) [*Bayesian Data Analysis*](https://www.google.com/search?q=bayesian+data+analysis&oq=bayesian+data+analysis&aqs=chrome.0.69i59j69i60l2j69i61j69i65j0.3253j1j4&sourceid=chrome&ie=UTF-8)
+* Stan Development Team (2018) [*Bayesian Statistics Using Stan*](http://www.stat.columbia.edu/~gelman/bda.course/_book/)
+
+## Source code {-}
+All of the source code, data, text, and images for this case study are available on GitHub at：
+* [A bayesian approach to indentify morgage default rate at city level](https://github.com/ChrisChen0429/BDA_project)
+
+## Complete Stan program {-}
+The complete Stn program for this case study are  available on the google at:
+* [A bayesian approach to indentify morgage default rate at city level](https://github.com/ChrisChen0429/BDA_project)
+
+
+## Acknowledgements {-}
+Thanks to Simon Woodward, Arya Pourzanjani, and Leo Lahti for helpful comments on earlier drafts and Peter Howard for providing the provenance of the data and the original case study with the data.
+
+<br />
+
+
+
+## Session information  {-}
+<div style="font-size:90%">
+```{r}
+sessionInfo()
+```
+</div>
+
+## Licenses  {-}
+
+<span style="font-size:85%">Code &copy; 2017--2018, Columbia University in New York, licensed under BSD-3.</span>
+
+<span style="font-size:85%">Text &copy; Andres Potapczynski, Jongwoo Choi, Yi Chen </span>

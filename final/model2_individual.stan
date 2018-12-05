@@ -16,6 +16,7 @@ functions {
   }
 }
 
+
 data {
   int<lower = 1> S;                     // number of state
   int<lower = 1> N;               // number of record of train set
