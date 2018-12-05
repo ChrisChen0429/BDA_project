@@ -1,5 +1,5 @@
 ---
-title: "Final Poject"
+title: "A bayesian approach to indentify morgage default rate at city leve"
 author: "Andres Potapczynski, Jongwoo Choi, Yi Chen"
 date: "28 January 2018"
 output:
@@ -407,7 +407,7 @@ All of the source code, data, text, and images for this case study are available
 
 ## Complete Stan program {-}
 The complete Stn program for this case study are  available on the google at:
-* [A bayesian approach to indentify morgage default rate at city level](https://github.com/ChrisChen0429/BDA_project)
+* [A bayesian approach to indentify morgage default rate at city level](https://docs.google.com/document/d/1N0XtUlnsnYi_bInkrbTQG2DCD1Hf7mXaSoZWQbWrOqg/edit?usp=sharing)
 
 
 ## Acknowledgements {-}
