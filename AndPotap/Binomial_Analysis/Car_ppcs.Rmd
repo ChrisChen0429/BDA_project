@@ -1,0 +1,81 @@
+---
+title: "CAR Ppcs"
+author: "Andres Potapczynski (ap3635)"
+output: pdf_document
+---
+
+```{r Inputs, include=FALSE}
+library(rstan)
+library(tidyverse)
+library(ggplot2)
+library(arm)
+library(bayesplot)
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+knitr::opts_chunk$set(echo = TRUE)
+source('../Utils/processing.R')
+```
+
+```{r Set the parameters, message=FALSE, warning=FALSE}
+file <-  '../DBs/city_st.txt'
+file_adjacency <- '../DBs/A.txt'
+file_model <- './selected/car.stan'
+file_output <- './Outputs/sims_car_all.rds'
+SEED = 1234
+
+CHAINS = 8
+ITER = 3000
+pct_train = 0.8
+pct = 1
+# pct = 0.1
+# pct = 0.01
+comp_sm <- stan_model(file_model)
+```
+
+```{r Load the data, message=FALSE, warning=FALSE}
+## Load the data
+data <- read_delim(file = file, delim = '|')
+A <- read_csv(file = file_adjacency, col_names = FALSE)
+
+# Sample the data
+data = sample_data(data = data, pct = pct, SEED = SEED)
+
+## Selecting the relevant columns for the analysis
+inputs <- data %>% dplyr::select(
+  state,
+  city,
+  client_income,
+  # mar_2_inc,
+  appraisal_value,
+  app_2_inc,
+  # asset_market_value,
+  mar_2_app,
+  sex_F,
+  age,
+  risk_index,
+  employed_30,
+  condition_U,
+  city_n,
+  ID_state,
+  y)
+summary(inputs)
+```
+
+```{r Run the model, include=FALSE}
+data_stan_car = STAN_car(inputs=inputs, W = A)
+
+sm = sampling(comp_sm, data=data_stan_car, iter=ITER, chains=CHAINS)
+
+## Save the Model
+saveRDS(sm, file = file_output)
+
+## Load the Model
+sm2 <- readRDS(file = file_output)
+```
+
+```{r Print the results of the model}
+print(sm2,
+      pars = c('alpha', 'beta'),
+      digits = 2, 
+      probs = c(0.025, 0.5, 0.975))
+```

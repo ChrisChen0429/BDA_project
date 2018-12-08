@@ -34,12 +34,18 @@ data {
 } model { 
   a ~ std_normal();
   alpha ~ std_normal();
-  rho ~ inv_gamma(5, 5);
+  rho ~ inv_gamma(7, 7);
   eta ~ std_normal();
   y_train ~ binomial_logit(State_N_train, a + f[1:N_train]);
 } generated quantities {
+  int<lower=0> yrep_train[N_train];
   int<lower=0> yrep_test[N_test];
+  for (i in 1:N_train) {
+    yrep_train[i] = binomial_rng(State_N_train[i], 
+    inv_logit(a + f[i]));
+    }
   for (i in 1:N_test) {
-    yrep_test[i] = binomial_rng(State_N_test[i], inv_logit(a + f[N_train + i]));
+    yrep_test[i] = binomial_rng(State_N_test[i], 
+    inv_logit(a + f[N_train + i]));
   }
 }
