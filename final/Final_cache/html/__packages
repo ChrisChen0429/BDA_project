@@ -1,8 +1,0 @@
-base
-ggplot2
-gridExtra
-knitr
-reshape
-StanHeaders
-rstan
-tufte
