@@ -32,6 +32,8 @@ file_hier <- '../AndPotap/Binomial_Analysis/Outputs/sims_Hier_all.rds'
 file_car <- '../AndPotap/Binomial_Analysis/Outputs/sims_car_all.rds'
 file_gp <- '../AndPotap/Binomial_Analysis/Outputs/sims_GP_all.rds'
 
+file_binomial_fake <- '../AndPotap/Binomial_Analysis/Outputs/baseline_fit_fake.rds'
+
 source('../AndPotap/Utils/processing.R')
 SEED = 1234
 pct_train = 0.8
@@ -51,6 +53,8 @@ sm_binomial <- readRDS(file = file_binomial)
 sm_hier <- readRDS(file = file_hier)
 sm_car <- readRDS(file = file_car)
 sm_gp <- readRDS(file = file_gp)
+
+fake_binomial <- readRDS(file = file_binomial_fake)
 ```
 
 ```{r Load the data, include=FALSE, message=FALSE}
@@ -280,6 +284,17 @@ $$\beta \sim Cauchy(0,5)$$
 ## Parameter Recovery
 
 [...][Add how the model recovers the parameters]
+```{r}
+set.seed(1234)
+a <- rcauchy(1, 0, 10)
+beta <- rcauchy(7, 0 , 2.5)
+sims_fake <-  as.matrix(fake_binomial)
+true <- c(a, beta)
+color_scheme_set('brightblue')
+mcmc_recover_hist(sims_fake[, 1:8], true = true)
+```
+
+
 
 ## Results
 
