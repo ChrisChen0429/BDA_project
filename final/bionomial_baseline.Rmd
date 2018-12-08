@@ -139,14 +139,12 @@ inputs <- city_summary %>%
     sum_y,
     sum_y2
   )
-
-
 ```
 
 
 ## Baseline Model: Binomial 
 
-Our baseline model is binomial. We give cauchy priors on the coefficient parameter $\beta$ the intercept $a$.
+Our baseline model is simple binomial regression model. We give weak cauchy priors on the coefficient parameter $\beta$ the intercept $a$.
 In the city level, we assume that the number of individual records in city $i$ is $n_i$.
 $$
 a \sim \mathsf{Cauchy}(0, \; 10)
@@ -160,9 +158,14 @@ y_{i} \sim \mathsf{Binomial} (n_{i}, \; logit^{-1}(a + \beta \cdot X_{i}))
 $$
 
 The binomial baseline model is given by:
+```{r results='hide', warning=FALSE, message=FALSE, cache=TRUE}
+baseline_model_binom=stan_model('binomial_baseline_city.stan')
+```
+
 ```{r}
 print_file('binomial_baseline_city.stan')
 ```
+
 
 ### Parameters recovered
 
@@ -188,27 +191,34 @@ fake_baseline_data <- list(N_train=N, N_test=N, D=D,
                            y_train = y_fake)
 ```
 
-```{r results='hide', warning=FALSE, message=FALSE, cache=TRUE}
-baseline_model_binom=stan_model('binomial_baseline_city.stan')
+
+```{r results='hide', warning=FALSE, message=FALSE, cache=TRUE, eval=FALSE}
 fit_fake <- sampling(baseline_model_binom, 
                      data=fake_baseline_data, seed=1234)
+saveRDS(fit_fake, file = 'baseline_fit_fake.rds')
 ```
 
 ```{r}
+fit_fake <- readRDS(file = 'baseline_fit_fake.rds')
 print(fit_fake, pars = c('a', 'beta'),
       digits = 2, probs = c(0.025, 0.5, 0.975))
 ```
+
 
 ```{r}
 plot(fit_fake)
 ```
 
+
+The following plot shows how well parameters recovered. 
 ```{r}
 sims_fake <- as.matrix(fit_fake)
 true <- c(a, beta)
 color_scheme_set("brightblue")
 mcmc_recover_hist(sims_fake[, 1:8], true)
 ```
+
+We see that most $\beta$'s didn't recovered well except $beta_{6}$ and $\beta_{7}$.
 
 
 ### Fit real data
@@ -226,23 +236,53 @@ baseline_data = list(N_train=N, N_test=N, D=D,
                      y_train = y)
 ```
 
-```{r results='hide', warning=FALSE, message=FALSE, cache=TRUE}
+```{r results='hide', warning=FALSE, message=FALSE, cache=TRUE, eval=FALSE}
 fit1 <- sampling(baseline_model_binom,
                  data=baseline_data, seed=1234)
+saveRDS(fit1, file = 'baseline_fit1.rds')
 ```
 
+
+The following shows the posterior mean and sd of our parameters.
 ```{r}
+fit1 <- readRDS(file = 'baseline_fit1.rds')
 print(fit1, pars=c('a', 'beta', 'lp__'),
       digits = 2, probs = c(0.025, 0.5, 0.975))
 ```
 
+The posterior mean of intercept $a$ is $-2.68$ with standard deviation $0.04$. We can also see the posterior mean and standard deviation of coefficient parameter $\beta$ from the above table. We see that $\beta_{2}$ and $\beta_{3}$
+have larger standard deviation compare to others. 
+
+
 
 ### PPC
+
+In stan model, we generated $y_rep$ of city level using `binomial_rng` function in stan.
+
+```{r}
+'transformed parameters {
+  vector[N_train] eta;
+  eta = a + X_train*beta;               // probability in binomial regression
+}
+
+generated quantities{ 
+  int<lower =0> y_rep[N_train];
+  for (i in 1:N_train){
+    y_rep[i] = binomial_rng(n_city_train[i], inv_logit(eta[i]));
+  }
+}'
+```
+
+
+The following shows the posterior predictive check. 
 
 ```{r}
 y_rep <- as.matrix(fit1, pars = "y_rep")
 ppc_dens_overlay(y = y, y_rep[1:200,])
 ```
+
+We see that the new $y$ fit well even though there were some gaps. 
+
 
 ```{r}
 sims <- rstan::extract(fit1)
@@ -277,16 +317,14 @@ gridExtra::grid.arrange(meangg, sdgg, maxgg, mingg,
 
 ```
 
+
 ```{r}
 # Scatterplot of two test statistics
 ppc_scatter_avg(y = y, yrep = y_rep)
 ```
 
-```{r echo=FALSE, include=FALSE, eval=FALSE}
-ppc_intervals(y = y, yrep = y_rep, 
-              x = X$income_state_city) + 
-  ggplot2::xlab("Income State City")
-```
+Scattor plot looks linear but it is not perfect. 
+
 
 ```{r echo=FALSE, include=FALSE, eval=FALSE}
 library('shinystan')
@@ -296,6 +334,8 @@ shiny_base = as.shinystan(fit1)
 
 
 ### Evaluation (RMSE)
+
+We evaluate our training model with RMSE using 5 fold cross validation.
 
 ```{r results='hide', warning=FALSE, message=FALSE, cache=TRUE}
 ## K fold CV
@@ -365,8 +405,8 @@ for (i in 1:5){
 average_RMSE <- mean(rmse)
 sd_RMSE <- sd(rmse)
 
-cat('Model RMSE average: ', average_RMSE)
-cat('Model RMSE standard deviation: ', sd_RMSE)
+cat('The average of RMSE of baseline model is: ', average_RMSE)
+cat('The standard deviation of RMSE of baseline model is: ', sd_RMSE)
 
 ```
 

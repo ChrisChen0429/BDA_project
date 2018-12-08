@@ -1,0 +1,541 @@
+---
+title: 'BDA Project: Predicting Default Throughout Mexico'
+author: "Andres Potapczynski (ap3635), Jongwoo Choi (jc4816), Yi Chen (yc3356)"
+date: "12/10/2018"
+output: pdf_document
+---
+
+```{r, include=FALSE}
+## 
+```
+
+```{r Imports, message=FALSE, warning=FALSE, include=FALSE}
+library(rstan)
+library(tidyverse)
+library(ggplot2)
+library(gridExtra)
+library(bayesplot)
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+knitr::opts_chunk$set(include = TRUE)
+getwd()
+```
+
+```{r Files, include=FALSE, warning=FALSE}
+file_core <-  '../AndPotap/DBs/core.txt'
+file_city <-  '../AndPotap/DBs/city_st.txt'
+file_adjacency <- '../AndPotap/DBs/A.txt'
+
+file_logistic <- '../AndPotap/Binomial_Analysis/Selected/logistic.stan'
+file_binomial <- '../AndPotap/Binomial_Analysis/Outputs/sims_Binomial_all.rds'
+file_hier <- '../AndPotap/Binomial_Analysis/Outputs/sims_Hier_all.rds'
+file_car <- '../AndPotap/Binomial_Analysis/Outputs/sims_car_all.rds'
+file_gp <- '../AndPotap/Binomial_Analysis/Outputs/sims_GP_all.rds'
+
+file_binomial_fake <- '../AndPotap/Binomial_Analysis/Outputs/baseline_fit_fake.rds'
+
+source('../AndPotap/Utils/processing.R')
+SEED = 1234
+pct_train = 0.8
+
+# CHAINS = 4
+# ITER = 2000
+CHAINS = 1
+ITER = 2000
+
+pct = 1
+# pct = 0.1
+# pct = 0.01
+
+## Read the results from the simulations
+comp_logistic <- stan_model(file_logistic)
+sm_binomial <- readRDS(file = file_binomial)
+sm_hier <- readRDS(file = file_hier)
+sm_car <- readRDS(file = file_car)
+sm_gp <- readRDS(file = file_gp)
+
+fake_binomial <- readRDS(file = file_binomial_fake)
+```
+
+```{r Load the data, include=FALSE, message=FALSE}
+data_core <- read_delim(file = file_core, delim = '|')
+data <- read_delim(file = file_city, delim = '|')
+A <- read_csv(file = file_adjacency, col_names = FALSE)
+
+# Sample the data
+## toHere
+data_core = sample_data(data = data_core, pct = 0.01, SEED = SEED)
+data = sample_data(data = data, pct = pct, SEED = SEED)
+
+## Selecting the relevant columns for the analysis
+inputs <- data %>% dplyr::select(state, city,
+  client_income, appraisal_value, app_2_inc, mar_2_app, sex_F, age, risk_index, employed_30, condition_U, city_n, ID_state, y)
+
+# inputs_logistic <- data_core %>% dplyr::select(state, city, client_income, app_2_inc, mar_2_app, sex_F, age, employed_30, condition_U, y)
+inputs_logistic <- data_core %>% dplyr::select(state, city, client_income, ratio, sex_F, age, condition_U, factor_employed, risk_index, effective_pay, y)
+
+## For city level analysis
+data_stan = STAN_city(inputs = inputs)
+data_stan_log = STAN_ind(inputs = inputs_logistic)
+data_stan_car = STAN_car(inputs=inputs, W = A)
+
+df_state = inputs %>% 
+    group_by(ID_state) %>% 
+    summarize(y_state = sum(y))
+```
+
+# Abstract
+We help an small mortgage lending start-up in Mexico understand how several demographical and economic variables predict default in different cities throughout the country. We find that XXX. For this we tested over XXX models which showed us that XXX. 
+
+Note: All the code and STAN models can be found in the following link [...][Add GitHub link]
+
+The results of our analysis is summarized in the table below.
+
+[...][Finish Summary Table and Verify the Numbers]
+
+
+# Setting the preamble
+__In this project we are helping a small mortgage lending start-up in Mexico understand how different cities differ in their risk to default on their mortgage__. This start-up has recently entered the market and wants us to help it asses how it should expand geographically throughout the country. Put differently, they want us to help them prioritize the expansion to cities that have shown the highest compliance as well as to understand how different variables predict such compliance. 
+
+In order to accomplish this, __we were provided with a large data set of 30,499 mortgages with over 90 covariates__ (for a comprehensive explanation of the data set see the next section). Also, __we interviewed the startup to understand their main hypothesis__ of why different cities might have a diverging default behavior as well as to retrieve all the domain knowledge possible for both our modeling and our prior assumptions. Our main findings were:
+
+* __Some northern states in Mexico are fighting a drug war against different cartels and some cities have been specially damaged__. Thus, even though the northern region of Mexico is one of the wealthiest, cities belonging to the states of Sinaloa, Coahuila and Nuevo Leon might present higher default rates that cannot be explained with the covariates that we were given (since non are related to this event).
+
+* __Poor southern states have a cultural tendency to fall easier into default__. States like Oaxaca might present a higher default rate even among high income individuals. The rational is that, given the low financial penetration in those states, individuals are less concern about their credit score and thus are more prone to abandon their properties if they fall into financial distress or even when they dislike their property.
+
+* __The covariates related to employment should be the most predictive variables__. The start-up believes that the main driver of default is that people lose their jobs. Thus, the employment variables of our data set should be the most relevant.
+
+# Understanding the data
+In this section we examine three main elements of the data set that we were given. First, we expose the set of covariates that we were given. Next, we show the most important plots from of exploratory data analysis. Finally, we detail the preprocessing steps that we took before pushing the data into `STAN`.
+
+## Covariates
+As mentioned in the introduction, the data set consists of __30,499 mortgages with over 90 covariates__ (where some of features are simply administrative and thus were not included in the analysis). __The average default rate is 6%__. Also, the data set provided was __their latest report available at August 2018__. We group the covariates in the following categories:
+
+* __[Location]__ `state`, `city` and `zip`: These features will allow me to understand if the client's behavior varies by geography. Also, I have this location features for both the house acquired and for the owner's location.
+
+* __[Demographics]__ `age`, `sex`, `ratio`, `risk_index`, `client_income` and `credit_score`. The feature `ratio` is the % of the client's income that the monthly payments for its mortgage represent. The `risk_index` is a variable that combines several metrics associated with his likelihood of paying a debt. The `client_income` feature is the monthly income that the person earned at that moment in time when she signed the mortgage. Finally, the ordinal variable `credit_score` evaluates how the client has performed in previous debts (related to `risk_index`).
+
+* __[Asset features]__ `vendor name`, `new_used`, and `appraisal_value`: These features tell us who was the vendor (either a construction company or an individual) and if the asset is new or not as well as the amount of money the person was given as a mortgage.
+
+* __[Employment]__ `employer_name` and `factor_employed`. The first feature conveys who is the employer and the second one information about the client's status of employment.
+
+* __[Payment Records]__ `days_pay`, and `y`. The first feature counts the number of days that have passed between the last payment date and the date on which the mortgage started. The next feature is the target variable that is 1 if the mortgage has at least one month without a payment and 0 otherwise. 
+
+Note that features like `interest_rate` and `contract_length` are present but have no variance. The current _product offer_ in the data base is a 12% interest rate mortgage for 30 years. Thus it is impossible to pose counter factual questions for those variables. 
+
+## Exploratory Data Analysis
+Our main tool for this analysis was to use some Machine Learning techniques as well as to plot the data in creative ways. The ML techniques that we used fall into two categories: (1) classification and (2) clustering. The data is highly unbalanced, thus predicting always that the person is not going to default ($Y=0$) already achieves a 93% test accuracy. Thus, in terms of (1) we ran KNN and Decision Trees (both nonparametric classifier) in order to understand if the data that we were given contained the variables (and possible the interactions) which could increase the accuracy of default prediction. In terms of (2), we ran k-means which is a clustering technique that enable us to understand the different profile of persons in the data; these profile are detailed below as well as the graphs that we came up with.
+
+The results of the first exercise are the following. 
+
+Classifier | 5 fold Test Accuracy
+------------- | -------------
+KNN | 94 %
+Decision Tree | 93 %
+Always Predict Zero | 93 %
+
+Were we see that it appears futile to perform our analysis at the individual level since the variables that we were given do not separate the data. However, as our baseline model, we do try this alternative.
+
+The plots of the variables that we included in the analysis are:
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+market_value <- data %>% filter(asset_market_value < 1600000)
+ratio_hist <- data %>% filter(ratio > 0.20)
+risk_hist <- data %>% filter(risk_index > 1900, risk_index < 2400)
+zip_hist <- data_core %>% group_by(zip, state, city) %>% 
+  summarize(mean_income = mean(client_income)) %>% 
+  arrange(desc(mean_income)) %>% 
+  ungroup()
+
+g1 <- ggplot(data = market_value, mapping = aes(x = asset_market_value / 1000)) +
+  geom_histogram(fill='lightblue', color='black', bins = 30) +
+  labs(title = 'Houses concentrated at $300-600',
+       subtitle = 'Asset Market value distribution') +
+  ylab(NULL) +
+  xlab('K MXN') +
+  theme(plot.title = element_text(size = 10, face = "bold")) +
+  theme(plot.subtitle = element_text(size = 8)) +
+  theme(axis.title.x = element_text(size = 8))
+
+## Ratio distribution
+g2 <- ggplot(data = ratio_hist, mapping = aes(x = ratio)) +
+  geom_histogram(fill='lightblue', color='black', bins = 30) +
+  labs(title = 'No over 30% mortgages',
+       subtitle = 'Ratio (Mortgage / Income) distribution') +
+  ylab(NULL) +
+  xlab('ratio') +
+  theme(plot.title = element_text(size = 10, face = "bold")) +
+  theme(plot.subtitle = element_text(size = 8)) +
+  theme(axis.title.x = element_text(size = 8))
+
+## Risk index distribution
+g3 <- ggplot(data = data, mapping = aes(x = employed_30)) +
+  geom_histogram(fill='lightblue', color='black', bins = 30) +
+  labs(title = 'Similar risks measurements',
+       subtitle = 'Risk index distribution') +
+  ylab(NULL) +
+  xlab('risk index (points)') +
+  theme(plot.title = element_text(size = 10, face = "bold")) +
+  theme(plot.subtitle = element_text(size = 8)) +
+  theme(axis.title.x = element_text(size = 8))
+
+## Zipcode income distribuion
+g4 <- ggplot(data = zip_hist, mapping = aes(x = mean_income)) +
+  geom_histogram(fill='lightblue', color='black', bins = 30) +
+  labs(title = 'Severly skewed',
+       subtitle = 'Income per zipcode distribution') +
+  ylab(NULL) +
+  xlab('MXN') +
+  theme(plot.title = element_text(size = 10, face = "bold")) +
+  theme(plot.subtitle = element_text(size = 8)) +
+  theme(axis.title.x = element_text(size = 8))
+
+## Diplay all the graphs
+gridExtra::grid.arrange(g1, g4, g2, g3,
+                        layout_matrix = rbind(c(1, 2), 
+                                              c(3, 4)))
+```
+
+
+## Data Preprocessing
+Below we list the main preprocessing steps that we did with the data
+
+* __Aggregated the variables at the city level__. The data set that we were given was at the individual mortgage level. In order to make it suitable for the geographical analysis we aggregated the relevant variables at the city level. The majority by the mean but some by their sum. For example, individual income and age were transformed into mean income and mean age in that city were as the binary response when people default was summed into the number of people that defaulted in that city.
+
+* __Transform to log space the variables related to money__. As it is well-known, income distributions tend to be skewed and to resemble extreme value densities. Thus, we transformed those values into the log space to bring closer together the large values that were present.
+
+* __Z-score all the variables__. Finally we, z-scored all the variables to put them in the same scale and thus assuring that placing a similar prior in their slope coefficients ($\beta_j$) made sense. 
+
+# Trying out Logistic Regression
+
+What appears most natural is to model this data with a logistic regression since we are trying to estimate a binary variable with information from several variables. However, as it was discussed previously, we find that the data is not informative at this level. Even with nonparametric methods it is not possible to uncover a clear relationship. However, we ran the model and show below where it falls short.
+
+## Specification
+
+The generative process is the following:
+$$\alpha \sim N(0,5)$$
+$$\beta \sim N(0,5)$$
+$$y_i \sim Ber(logit^{-1}(\alpha + X_i \beta))$$
+the variables that are going to be included for the $X$ are the following:
+`client_income`: $\beta_1$, `appraisal_value`: $\beta_2$, `app_2_inc`: $\beta_3$, `mar_2_app`: $\beta_4$, `sex_F`: $\beta_5$, `age`: $\beta_6$, `risk_index`: $\beta_7$, `employed_30`: $\beta_8$ and `condition_U`: $\beta_9$.
+
+## Results
+
+The results from fitting that previous model in STAN is
+
+```{r Results from Logistic Regression, include=FALSE}
+sm_logistic = sampling(comp_logistic, 
+                       data=data_stan_log, 
+                       iter=ITER, 
+                       chains=CHAINS)
+```
+
+```{r Prints from logistic regression, echo=FALSE}
+print(sm_logistic,
+      pars = c('alpha', 'beta'),
+      digits = 2, 
+      probs = c(0.025, 0.5, 0.975))
+      # probs = c(0.025, 0.25, 0.5, 0.75, 0.975))
+```
+
+As it can be seen above, there is a lot of uncertainty for the $\beta$'s. This will remain a constant theme throughout this analysis, however, in this case it is particularly true that all the coefficients include zero and that the intercept $\alpha$ takes the leading role. Now, without further discussing the model, let's see how it is not suitable for this analysis.
+
+## Evaluation
+
+The total number of people that default is a critical quantity to estimate for the start-up since there is a direct link to its profits. The following PPC shows how the logistic regression model has an unacceptable prediction for this quantity of interest.
+
+```{r Total logistic, message=FALSE, warning=FALSE, echo=FALSE}
+sims <- rstan::extract(sm_logistic)
+T_rep <- apply(X = sims$y_rep, MARGIN = 1, FUN = sum)
+T_obs <- sum(inputs$y)
+df = data.frame(T_rep=T_rep)
+ggplot(df, aes(x=T_rep)) +
+  geom_histogram(fill='lightblue',
+                 color='black') +
+  geom_vline(xintercept = T_obs, color = 'red') +
+  ylab('') +
+  xlab('Total Defaults in Mexico') +
+  ggtitle('Logistic Regression mostly predicts zeros')
+```
+
+as it can be seen above the value observe is completely off what the model predicts. Thus we now change our approach to the problem.
+
+# Changing the approach
+
+We changed our approach in the following manner. Rather than keep modelling the individual data, we aggregated it at the level on which the start-up was interested: city and state. The aggregation was mostly done by averaging the different variables for each individual. In this way, since we are now working with variables which are the combination of many small events (the individuals), the CLT then provides us with a more manageable data set. Now part of the noise was pruned on the aggregation process.
+
+With this new approach, we now focus on modelling a count variable: the number of defaults per city. For this type of data, we tried different models such as binomial, poisson and negative binomial. All of them yielded similar results: both for the values of $\beta$ and for held-out RMSE in 5 fold CV. We opted to continue the analysis with the binomial specification since it was converging fast and with not numerical problems (in contrast with the poisson model when even when using the function `poisson_log` in `STAN` we had numerical problems for some chains).
+
+## Specification
+
+The generative process for our main model of this section is
+
+$$\alpha \sim N(0,5)$$
+$$\beta \sim N(0,5)$$
+$$y_j \sim Bin(n_j, logit^{-1}(\alpha + X_j \beta))$$
+where now $j=1,\dots,880$ (total number of cities in the data set) and $X_j$ is equal to the average of all the value of that variables for all the individuals in that city. The other model specifications that we tried only changed how $y_j$ is distributed. For the poisson model we have
+$$y_j \sim Poi(n_j\,\exp(\alpha + X_j \beta))$$
+whereas for the negative binomial we have to add another positive parameter $\phi$. We employed the mean-variance parameterization and thus
+$$y_j \sim NegBin(\exp(\alpha + X_j \beta), \phi)$$
+
+Finally, as part of a prior check, we also substitute the normal priors for $$\alpha \sim Cauchy(0,5)$$
+$$\beta \sim Cauchy(0,5)$$
+
+## Parameter Recovery
+
+[...][Add how the model recovers the parameters]
+```{r}
+set.seed(1234)
+a <- rcauchy(1, 0, 10)
+beta <- rcauchy(7, 0 , 2.5)
+sims_fake <-  as.matrix(fake_binomial)
+true <- c(a, beta)
+color_scheme_set('brightblue')
+mcmc_recover_hist(sims_fake[, 1:8], true = true)
+```
+
+
+
+## Results
+
+We now present the results for the binomial model (as a `STAN` print) but also in a comparative table the result for the rest of the models. 
+
+```{r Prints for the binomial model, echo=FALSE}
+print(sm_binomial,
+      pars = c('alpha', 'beta'),
+      digits = 2, 
+      # probs = c(0.025, 0.25, 0.5, 0.75, 0.975))
+      probs = c(0.025, 0.5, 0.975))
+sims_binomial <- rstan::extract(sm_binomial)
+```
+
+Coeff |  Binomial | Binomial Cauchy | Poisson | Negative Binomial
+------------- | ------------- | ------------- | ------------- | -------------
+$\alpha$ | -2.73 | -2.73 | -2.8 | -2.69
+$\beta_1$ | -0.27 | -0.20 | -0.23 | -0.32
+$\beta_2$ | 0.36 | 0.31 | 0.33 | 0.39
+$\beta_3$ | -0.2 | -0.17 | -0.17 | -0.25
+$\beta_4$ | -0.10 | -0.10 | -0.09 | -0.11
+
+$\beta_5$ | 0.04 | 0.04 | 0.03 | 0.04
+$\beta_6$ | 0.09 | 0.09 | 0.08 | 0.1
+$\beta_7$ | -0.19 | -0.19 | -0.17 | -0.2
+$\beta_8$ | 0.25 | 0.24 | 0.23 | 0.23
+$\beta_9$ | 0.11 | 0.11 | 0.1 | 0.13
+
+What we can conclude from the previous table is that our estimates are not perturbed by different model specifications. Moreover, the effect of adding a "robust" prior to the problem has little effect. 
+
+From the following plot we see that we have a lot of uncertainty in our estimates. [...][Add that coefficients plot]
+
+## Evaluation
+
+Before jumping into the PPCs of the binomial model, we will present yet another comparative table between the models. Below is the RMSE for 5 fold CV with an 80 / 20 split each time.
+
+Model | 5 fold RMSE (sd RMSE) at City
+------------- | -------------
+Predict always zero | 7.174 (1.58)
+Binomial | 1.87 (0.239)
+Binomial Cauchy | 1.866 (0.24)
+Poisson | 1.87 (0.242)
+Negative Binomial | 1.8513 (0.2383)
+
+Model | 5 fold RMSE (sd RMSE) at State
+------------- | -------------
+Predict always zero | 23.63 (4.45)
+Binomial | 4.69 (0.981)
+Binomial Cauchy | 4.69 (0.977)
+Poisson | 4.69 (0.9814)
+Negative Binomial | 4.657 (0.9742)
+
+Again, we start by looking at the tail value of the sum of the total defaults predicted by the model. Now we check how well the model is able to replicate the per city counts. 
+
+```{r PPCs Binomial, warning=FALSE, message=FALSE, echo=FALSE}
+plot_ppcs(sm = sm_binomial, sims = sims_binomial, inputs = inputs)
+```
+
+We observe that the model is able to satisfactorily mimic the distribution of the data. In addition, the model is also able to emulate the distribution of the data if we aggregate it at the state level.
+
+Thus far everything is looking great. However, if we look at the per individual state graphs. We acknowledge some deficiency which leave some room for improvement. [...][Add multiple plots here]
+
+```{r echo=FALSE}
+y_state_rep <- state_rep(sims = sims_binomial, inputs = inputs)
+plot_states(y_state_rep = y_state_rep, df_state = df_state)
+```
+
+# Including some Hierarchy
+
+The easiest way to fix a PPC is to model it directly. It appears as cheating. In the sense that we keep expanding the model to every eventuality that we encounter; nonetheless, if this eventuality is actually an aspect of the model that we do care then there is not evident harm on expanding the model to fit this aspect as well. This is what we do for the first model expansion. We introduce a hierarchical structure at the state level to each of the intercepts.
+
+## Specification
+
+The generative process now is the following
+
+$$\alpha \sim N(0,5)$$
+then for each $s=1,\dots,32$ 
+$$\sigma_s \sim lognormal(\log(1),1) $$
+$$\alpha_s \sim N(\alpha, \sigma_j)$$
+$$\beta \sim N(0,5)$$
+$$y_j \sim Bin(n_j, logit^{-1}(\alpha_{s_j} + X_j \beta))$$
+where again $j=1,\dots,880$. Now we have an offset that should give us sufficient flexibility to estimate what we want to.
+
+## Parameter Recovery
+
+[...][See if this is actually needed]
+
+## Results
+
+The results of incorporating this hierarchical structure can be seen below.
+
+```{r Print the results of the hierarchical model, echo=FALSE}
+#toHere
+print(sm_hier,
+      pars = c('alpha', 'beta'),
+      digits = 2, 
+      probs = c(0.025, 0.5, 0.975))
+sims_hier <- rstan::extract(sm_hier)
+```
+
+## Evaluation
+
+As always, we start with the PPC for the total number of defaults
+
+```{r PPCs Hier, warning=FALSE, message=FALSE, echo=FALSE}
+plot_ppcs(sm = sm_hier, sims = sims_hier, inputs = inputs)
+```
+
+```{r echo=FALSE}
+y_state_rep <- state_rep(sims = sims_hier, inputs = inputs)
+plot_states(y_state_rep = y_state_rep, df_state = df_state)
+```
+
+Now it is worth pointing out that in terms of 5 fold CV this extension worsens the performance. The 5 fold RMSE is: 2.1594 (0.61). Even though held out scores are a common currency to compare models, it is not necessarily true that we should always pick the one with the lowest error especially when the differences are not as substantial. Nonetheless, our next model fixes this loss of predictibility and estimates the state default means as well as the model of this section.
+
+# Leveraging from Spatial information
+
+In this section we yet again expand the previous model. Now by incorporating spatial information. As seen before, the addition of a hierarchical structure into our model made the $y^{rep}$ at the state level fit much better. Nonetheless we suffered a decrease in held-out accuracy. Thus we explore if adding spatial information is able to alleviate that. The idea is to upgrade the hierarchical interaction of the $\alpha_s$'s where now they share information between neighboring states.
+
+## Specification
+
+One of the most popular ways to incorporate spatial random effects it to use Conditional Auto regressive (CAR) priors. Now instead of $\alpha_s$ we are going to switch to $\phi_s$. Now the process is the following:
+
+$$\phi_s \mid \phi_j \sim N(\alpha \sum_{j = 1}^n b_{sj} \phi_j, \tau_s^{-1})$$
+where each $b_{sj}$ is an element that encodes the adjacency matrix information and $\tau_s$ is a spatially varying precision. By using Brook's lemma we can express simplify the previous expression as:
+$$\phi \sim N(0,[D_{\tau} (I-\alpha B)]^{-1})$$
+where 
+
+* $D = diag(m_s)$ is a $32 \times 32$ diagonal matrix where $m_s$ is the number of the neighbors for the state $s$
+
+* $D_{\tau} = \tau D$  and $\tau$ is the variance hyperparameter for the $\phi$s
+
+* $\alpha$ is the parameter that controls spatial dependence.
+
+* $B = D^{-1} W$ is the scaled adjacency matrix (discussed above). And $W$ is the adjacency matrix. ($w_{ss}=0$, $w_{ij}=1$ if the state s is a neighbor of state j and zero otherwise)
+
+However, to alleviate the computational burden, it is common to use the IC
+AR prior where, in the previous expression $\alpha$ is set to $1$. The only problem with the ICAR prior is that it is improper.
+
+The generative process is
+
+$$\alpha \sim Cauchy(0,2.5)$$
+$$\beta \sim Cauchy(0, 5)$$
+$$\tau \sim Gamma(2, 2) $$
+then for each $s=1,\dots,32$ 
+$$\phi_s \sim N(0,[D_{\tau} (I-\alpha B)]^{-1})$$
+and finally 
+$$y_j \sim Bin(n_j, logit^{-1}(\alpha + \phi_{j_s} + X_j \beta))$$
+where again $j=1,\dots,880$.
+
+Before moving forward, it is important to make two comments:
+
+* This prior on the $\phi_s$ is more restrictive than the previous prior on $\alpha_s$. Thus, we expect more regularization.
+
+* This design of the model is better for interpretation and for the questions that the start-up wants to answer (since they have geographical concerns). With this model we can _learn_ about geographical patterns.
+
+## Parameter Recovery
+
+[...][Show that it recovers the parameters]
+
+## Results
+
+```{r Prints for the car, echo=FALSE}
+print(sm_car,
+      pars = c('alpha', 'beta'),
+      digits = 2, 
+      # probs = c(0.025, 0.25, 0.5, 0.75, 0.975))
+      probs = c(0.025, 0.5, 0.975))
+sims_car <- rstan::extract(sm_car)
+```
+
+[...][Show the phi's graphs]
+
+## Evaluation
+
+As always, we start with the PPC for the total number of defaults
+
+```{r PPCs Car, warning=FALSE, message=FALSE, echo=FALSE}
+plot_ppcs(sm = sm_car, sims = sims_car, inputs = inputs)
+```
+
+```{r echo=FALSE}
+y_state_rep <- state_rep(sims = sims_car, inputs = inputs)
+plot_states(y_state_rep = y_state_rep, df_state = df_state)
+```
+
+[...][Replicate Yi's PPCs plots]
+
+Also, we were glad to find that the RMSE for the CAR model is 1.9284 (0.28) which is a bit above of the other regression models but not by much. Moreover, it does reduce the standard held-out deviation to from 0.6 to 0.28.
+
+# Testing out Nonparametric methods
+
+Finally we incorporated a Gaussian Process as our last analysis. Rather than an extension of the previous model, we see this as an alternative route that we took to understand if there were any interaction or nonlinearities in the data. Moreover, since this model fits well to the data, we leave as a future extension the addition of the ICAR prior to this model (although it would probably take days to fit).
+
+## Specification
+
+Nonparametrics do not follow the same generative interpretation from the previous discussions. Now, instead of a generative process over numbers, we have a probability distribution over functions. As the name suggests, the Gaussian process relies on the multivariate normal distibution where now instead of a mean and covariance matrix we have a mean _function_ and a covariance _function_. Mathematically, 
+
+$$y \sim MVN(a + f(x), K(x|\theta))$$
+where $a$ is an intercept value we included, $f(x)$ is the realization of a function over the $N$ inputs and the positive-definite matrix takes the common form of
+
+$$
+K(x | \alpha, \rho, \sigma)_{i, j}
+= \alpha^2
+\exp \left(
+- \dfrac{1}{2 \rho^2} \sum_{d=1}^D (x_{i,d} - x_{j,d})^2
+\right)
++ \delta_{i, j} \sigma^2,
+$$
+where $\alpha$, $\rho$ and $\sigma$ are the hyperparametrs. In this context $\alpha$ is called the _marginal standard deviation_ and it controls the magnitude of the range of the function modeled by the GP. Moreover, $\rho$ is called the _length-scale_ parameters and links to the smoothness of the function represented by the GP.
+
+## Parameter Recovery
+We do not test for parameter recovery since the model was taking too long to run. We distributed the large running time for CV and results.
+
+## Results
+
+```{r Print the results of the GP, echo=FALSE}
+print(sm_gp,
+      pars = c('alpha', 'rho', 'a'),
+      digits = 2, 
+      probs = c(0.025, 0.5, 0.975))
+sims_gp <- rstan::extract(sm_gp)
+sims_gp$y_rep <- sims_gp$yrep
+```
+
+From the value of $\rho$ we see that it is close to 1.5 and does indicates certain level of smoothness (which is evidence that our linear models were a defensible modelling assumption). Furthermore, the intercept $a$ is much lower than in the previous models (where it was denoted as $\alpha$). This is relevant to our analysis since it suggests that possible interactions of the given variables make take some of the explanatory effect from the intercept. This is reinforced by the fact that it is not the nonlinearities that are taking the weight-off the intercept (since $\rho$ is close to 2) but rather some interactions.
+
+## Evaluation
+
+Below is the performance of the GP over our set of four relevant PPCs
+
+```{r PPCs GP, warning=FALSE, message=FALSE, echo=FALSE}
+plot_ppcs(sm = sm_gp, sims = sims_gp, inputs = inputs, legend = 'yrep')
+```
+
+were we see that the model, at this levels, equally as good as the previous models. We were afraid that adding much more complexity could distort this. Moreover, we did a a single CV fold where the value was 1.71. It is lower than the values seen in the previous models however are not sure if this is just a result of chance, since maybe it was a train / test partition that was favorable for this model.
+
+At this point we were unsure on how to proceed extracting more value out of our GP analysis. We also leave for future work to understand if there were some interactions suggested by the model as well as the nonlinearities (if present).
+
+# Conclusion
+[...][Add the main learning that we got from this analysis]
+
+# Stan Code
+[...][Add the GitHub link where they can find our code]
