@@ -387,3 +387,18 @@ saveRDS(individual, file = "individual_fit")
 print(individual, pars = c('alpha','beta','phi','theta','lp__'),probs=0.01)
 ss_mod = as.shinystan(individual)
 launch_shinystan(ss_mod)
+
+fit <- model2_full
+posterior <- as.matrix(fit)
+
+plot_title <- ggtitle("Posterior distributions",
+                      "with medians and 80% intervals")
+mcmc_intervals(posterior,
+           pars = c("phi[1]","phi[2]","phi[3]","phi[4]","phi[5]",
+                    "phi[6]","phi[7]","phi[8]","phi[9]","phi[10]",
+                    "phi[11]","phi[12]","phi[13]","phi[14]","phi[15]",
+                    "phi[16]","phi[17]","phi[18]","phi[19]","phi[20]",
+                    "phi[21]","phi[22]","phi[23]","phi[24]","phi[25]",
+                    "phi[26]","phi[27]","phi[28]","phi[29]","phi[30]",
+                    "phi[31]","phi[32]"),
+           prob = 0.95) + plot_title

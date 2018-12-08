@@ -1,37 +1,38 @@
 ---
-title: "A bayesian approach to indentify morgage default rate at city leve"
-author: "Andres Potapczynski, Jongwoo Choi, Yi Chen"
-date: "28 January 2018"
+title: "A bayesian approach to identify mortgage default at city level"
+author: "Andres Potapczynski (ap3635), Jongwoo Choi (jc4816), Yi Chen (yc3356)"
+date: "December 2018"
 output:
   tufte::tufte_html:
     toc: true
-    toc_depth: 1
+    toc_depth: 2
 ---
 ```{r setup, include=FALSE, echo=FALSE}
-options(htmltools.dir.version = FALSE)
+options(htmltools.dir.version = TRUE)
 options(digits = 2)
 library(ggplot2)
 library(gridExtra)
 library(knitr)
 knitr::opts_chunk$set(cache = TRUE)
-knitr::opts_chunk$set(tidy = FALSE, cache.extra = packageVersion('tufte'))
+knitr::opts_chunk$set(tidy = TRUE, cache.extra = packageVersion('tufte'))
 knitr::opts_chunk$set(comment = "")
 library(reshape)
 library(rstan)
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores(logical = FALSE))
 library(tufte)
+
 ggtheme_tufte <- function() {
   theme(plot.background =
           element_rect(fill = "#fffff8",
                        colour = "#fffff8",
-                       size = 0.5,
+                       size = 1,
                        linetype = "solid"),
-        plot.margin=unit(c(1, 1, 0.5, 0.5), "lines"),
+        plot.margin=unit(c(0.1, 0.1, 0.1, 0.1), "lines"),
         panel.background =
           element_rect(fill = "#fffff8",
                        colour = "#fffff8",
-                       size = 0.5,
+                       size = 1,
                        linetype = "solid"),
         panel.grid.major = element_line(colour = "white", size = 1, linetype="dashed"),
           # blank(),
@@ -43,16 +44,16 @@ ggtheme_tufte <- function() {
         axis.ticks = element_blank(),
         axis.text = element_text(family = "Palatino", size = 16),
         axis.title.x = element_text(family = "Palatino", size = 20,
-                                    margin = margin(t = 15, r = 0, b = 0, l = 0)),
+                                    margin = margin(t = 0.1, r = 0, b = 0, l = 0)),
         axis.title.y = element_text(family = "Palatino", size = 18,
-                                    margin = margin(t = 0, r = 15, b = 0, l = 0)),
+                                    margin = margin(t = 0, r = 0.1, b = 0, l = 0)),
         strip.background = element_rect(fill = "#fffff8",
                                         colour = "#fffff8",
                                         linetype = "solid"),
         strip.text = element_text(family = "Palatino", size = 16),
         legend.text = element_text(family = "Palatino", size = 16),
         legend.title = element_text(family = "Palatino", size = 16,
-                                    margin = margin(b = 5)),
+                                    margin = margin(b = 0.1)),
         legend.background = element_rect(fill = "#fffff8",
                                         colour = "#fffff8",
                                         linetype = "solid"),
@@ -61,6 +62,7 @@ ggtheme_tufte <- function() {
                                         linetype = "solid")
   )
 }
+
 printf <- function(msg = "%5.3f", ...) {
   cat(sprintf(msg, ...))
 }
@@ -69,60 +71,126 @@ printf <- function(msg = "%5.3f", ...) {
 
 ## Abstract {-}
 
+We help an small mortgage lending start-up in Mexico understand how several demographical and economic variables predict default in different cities throughout the country. We find that XXX. For this we tested over XXX models which showed us that XXX.
+
+
+# Introduction
+
+## Background
+
+**In this project we are helping a small mortgage lending start-up in Mexico understand how different cities differ in their risk to default on their mortgage.** This start-up has recently entered the market and wants us to help it asses how it should expand geographically throughout the country. Put differently, they want us to help them prioritize the expansion to cities that have shown the highest compliance as well as to understand how different variables predict such compliance.
+
+## Research Questions
+
+[. . . ]
+
+## Hypothesis
+We interviewed the startup to understand their main hypothesis of why different cities might have a diverging default behavior as well as to retrieve all the domain knowledge possible for both our modeling and our prior assumptions. Our main hypothesis are:
+
+ 1. Some northern states in Mexico are fighting a drug war against different cartels and some cities have been specially damaged. Thus, even though the northern region of Mexico is one of the wealthiest, cities belonging to the states of Sinaloa, Coahuila and Nuevo Leon might present higher default rates that cannot be explained with the covariates that we were given (since non are related to this event).
+ 
+ 2. Poor southern states have a cultural tendency to fall easier into default. States like Oaxaca might present a higher default rate even among high income individuals. The rational is that, given the low financial penetration in those states, individuals are less concern about their credit score and thus are more prone to abandon their properties if they fall into financial distress or even when they dislike their property.
+ 
+ 3. The covariates related to employment should be the most predictive variables. The start-up believes that the main driver of default is that people lose their jobs. Thus, the employment variables of our data set should be the most relevant.
+
+
+
+
+
 # Data
 
-## Introduction 
+## Dataset & Descriptive Statisics
+
+### Introduction
+[...] In this section we examine three main elements of the data set that we were given. First, we expose the set of covariates that we were given. Next, we show the most important plots from of exploratory data analysis. Finally, we detail the preprocessing steps that we took before pushing the data into STAN.
+
+**we were provided with a large data set of 30,499 mortgages with over 90 covariates** 
+
+### Covariates
+
+The average default rate is 6%. Also, the data set provided was their latest report available at August 2018. We group the covariates in the following categories:
+
+ 1. [Geographics] state, city and zip: These features will allow me to understand if the client’s behavior varies by geography. Also, I have this location features for both the house acquired and for the owner’s location.
+ 
+ 2. [Demographics] age, sex, ratio, risk_index, client_income and credit_score. The feature ratio is the % of the client’s income that the monthly payments for its mortgage represent. The risk_index is a variable that combines several metrics associated with his likelihood of paying a debt. The client_income feature is the monthly income that the person earned at that moment in time when she signed the mortgage. Finally, the ordinal variable credit_score evaluates how the client has performed in previous debts (related to risk_index).
+ 
+ 3. [Economics]
+ 
+ * [Asset features] vendor name, new_used, and appraisal_value: These features tell us who was the vendor (either a construction company or an individual) and if the asset is new or not as well as the amount of money the person was given as a mortgage. 
+ 
+ * [Employment] employer_name and factor_employed. The first feature conveys who is the employer and the second one information about the client’s status of employment.
+ 
+ * [Payment Records] days_pay, and y. The first feature counts the number of days that have passed between the last payment date and the date on which the mortgage started. The next feature is the target variable that is 1 if the mortgage has at least one month without a payment and 0 otherwise.
+
+
+### Descriptive Statistics
+[...]
 
 ## Explortary Data Analysis
 
-## Data Processin 
 
-The data in our model has been processed the following steps:
-* Take the log of 'client_income' and 'asset_market_value'. 
+## Data Processing
 
-  Reason: The distribution of these two variables are highly right skewed with high-value outliers.
-* Standardized the design matrix. 
+Below we list the main preprocessing steps that we did with the data
+ 
+ 1. **Aggregated the variables at the city level.** The data set that we were given was at the individual mortgage level. In order to make it suitable for the geographical analysis we aggregated the relevant variables at the city level. The majority by the mean but some by their sum. For example, individual income and age were transformed into mean income and mean age in that city were as the binary response when people default was summed into the number of people that defaulted in that city.
 
-  Reason: Improve the coverage of MCMC. 
-Exclude intercept in the design matrix. Reason: variables are centered and the ICR model has been used.
-
-
+ 2. **Transform to log space the variables related to money.** As it is well-known, income distributions tend to be skewed and to resemble extreme value densities. Thus, we transformed those values into the log space to bring closer together the large values that were present.
+ 
+ 3. **Z-score all the variables.** Finally we, z-scored all the variables to put them in the same scale and thus assuring that placing a similar prior in their slope coefficients (βj) made sense.
 
 
-# Baseline Model : Linear Binormial Regression
+# Modeling
+
+## Introduction
+
+### Model Specification & Logic Flow
+
+### Parameter Specification
+
+### Prior Selection Principle
 
 
+## Baseline Model : Linear Binormial Regression
 
+### Model Introduction
 
-
-
-
-
-
-# Model Extension: CAR & Zero Inflation 
-
-## A linear binormial regression analogy
-
-Lik what we did in the baseline model. We process by treating the underlying deterministic model as providing an expected default times for each city around which there will be variation due to both measurement error and simplifications. Consider the typical formulation of a linear regression, where $y_n$ is the is an observable default time, $x_n$ is a row vector of unmodeled predictors ( independent variables), $\beta$ is a coefficient vector parameter and we separate the intercep as $a$. In the city level, we assume that the number of individual records in city $i$ is $n_i$.Thus, we have the model:
+We process by treating the underlying deterministic model as providing an expected default times for each city around which there will be variation due to both measurement error and simplifications. Consider the typical formulation of a linear regression, where $y_n$ is the is an observable default time, $x_n$ is a row vector of unmodeled predictors ( independent variables), $\beta$ is a coefficient vector parameter and we separate the intercep as $a$. In the city level, we assume that the number of individual records in city $i$ is $n_i$.Thus, we have the model:
 
 $$ y_i \sim Binormial(n_{i},logit^{-1}(a + x_i\beta)) $$
 As a robust prior distribution option, we take $\beta \sim cauchy(location=0,scale=2.5)$.
 
-In model 2, we will extend this model in two ways: (1) incoperate the geographic state information (2) zero inflated model.  
+ 
 
-### Extension one: Incoperate Geographic Information
+### Fake Data Recoverage
+
+### Model results
+
+### Model Check
+
+1. General Posterior Prediction Check
+
+2. Cross Validation
+
+
+## Model Extension: CAR & Zero Inflation 
+
+### Model Introduction 
+In model 2, we will extend this model in two ways: (1) incoperate the geographic state information (2) zero inflated model. 
+
+ 1. Extension one: Incoperate Geographic Information
 
 In this project, we utilize the IAR prior for state feature. Intrisnic conditional autoregressive (IAR)  is an extension of conditional autoregressive (CAR) models, which are popular as prior distributions for spatial random effects with areal spatial data. In our model, we have a random quantity $\phi = (\phi_1,\phi_2,...,\phi_{32})$ at 32 state areal locations. In each state, we have the individual records aggregated at the city level. And each city data belong to one state. According to the Brook's Lemma, the joint the distribution of $\phi$ can be expressed as the followings:
 $$\phi \sim N(0,[D_{\tau} (I-\alpha B)]^{-1})$$
 In this formula, we have:
 
-* $D = diag(m_i)$ is an $32 \times 32$ diagonal matrix with $m_i$ is the number of the neighbors for the state i
+ * $D = diag(m_i)$ is an $32 \times 32$ diagonal matrix with $m_i$ is the number of the neighbors for the state i
 
-* $D_{\tau} = \tau D$  and $\tau$ is the hyperparameter in the conditional distributions of the $\phi$
+ * $D_{\tau} = \tau D$  and $\tau$ is the hyperparameter in the conditional distributions of the $\phi$
 
-* $\alpha$ is the parameter that controls spatial dependence. In IAR, we let $\alpha =1$
+ * $\alpha$ is the parameter that controls spatial dependence. In IAR, we let $\alpha =1$
 
-* $B = D^{-1} W$ is the scaled adjacency matrix. And $W$ is the adjacency matrix. ($w_{ii}=0$,$w_{ij}=1$ if the state i is a neighbor of state j , and $w_{ij}=1$ otherwise)
+ * $B = D^{-1} W$ is the scaled adjacency matrix. And $W$ is the adjacency matrix. ($w_{ii}=0$,$w_{ij}=1$ if the state i is a neighbor of state j , and $w_{ij}=1$ otherwise)
 
 We can simplifies the IAR model to:
 
@@ -143,7 +211,8 @@ In  our model, we assume the hyperparameter $\tau \sim Gamma(shape = 2,rate = 2)
 
 ```{r eval=FALSE}
 functions {
-  real sparse_iar_lpdf(vector phi, real tau, int[,] W_sparse, vector D_sparse, vector lambda, int S, int W_n) {
+  real sparse_iar_lpdf(vector phi, real tau, int[,] W_sparse, 
+            vector D_sparse, vector lambda, int S, int W_n) {
       row_vector[S] phit_D; // phi' * D
       row_vector[S] phit_W; // phi' * W
       vector[S] ldet_terms;
@@ -151,12 +220,14 @@ functions {
       phit_D = (phi .* D_sparse)';
       phit_W = rep_row_vector(0, S);
       for (i in 1:W_n) {
-        phit_W[W_sparse[i, 1]] = phit_W[W_sparse[i, 1]] + phi[W_sparse[i, 2]];
-        phit_W[W_sparse[i, 2]] = phit_W[W_sparse[i, 2]] + phi[W_sparse[i, 1]];
+        phit_W[W_sparse[i, 1]] = phit_W[W_sparse[i, 1]] + 
+                                 phi[W_sparse[i, 2]];
+        phit_W[W_sparse[i, 2]] = phit_W[W_sparse[i, 2]] + 
+                                 phi[W_sparse[i, 1]];
       }
     
       return 0.5 * ((S-1) * log(tau)
-                    - tau * (phit_D * phi - (phit_W * phi)));
+            - tau * (phit_D * phi - (phit_W * phi)));
   }
 }
 ```
@@ -164,13 +235,14 @@ functions {
 After we get the IAR prior, we can take it into our model.For the $i$ the city in the $j$ the state, we have:
 
 $$ y_{ij} \sim Binormial(n_{ij},logit^{-1}(a + \phi_j + x_{ij}\beta)) $$
-* Reason for design the model in this way rather than hierarchical model:
+ 
+Here are the Reason for design the model in this way rather than hierarchical model:
 
-1. Hierarchical extension will greatly expend the demension of the parameter space. Consequently, the estimation convergence would be much more difficult.Just focus on the binormial regression part. If we take the hierarchical extension both on the intercept and coefficient terms, there will have $32 \times 1 = 32$ intercept paramters and $32 \times 7 = 224$ coefficient parameters (total 256 parameters).For taking  the hierarchical extension on  $\beta$s, we have 1 intercept and $7 \times 32 = 224$ coefficient in the binormial regression model (total 225 parameters). But now, we only have 1 parameter for overall intercept, 32 parameter for the state level effecr and 7 parameter for the different independent variables' effects.
+ * Hierarchical extension will greatly expend the demension of the parameter space. Consequently, the estimation convergence would be much more difficult.Just focus on the binormial regression part. If we take the hierarchical extension both on the intercept and coefficient terms, there will have $32 \times 1 = 32$ intercept paramters and $32 \times 7 = 224$ coefficient parameters (total 256 parameters).For taking  the hierarchical extension on  $\beta$s, we have 1 intercept and $7 \times 32 = 224$ coefficient in the binormial regression model (total 225 parameters). But now, we only have 1 parameter for overall intercept, 32 parameter for the state level effecr and 7 parameter for the different independent variables' effects.
 
-2. This design of model is better for interpreation and better for us to solve our research problems.Now the coefficient terms are not depend on the state prior. Thus, we can estimate the overall effect from these independent variables, like age and income. And on the state level effect, we can have the overall idea based on the estimated parameter values.
+ * This design of model is better for interpreation and better for us to solve our research problems.Now the coefficient terms are not depend on the state prior. Thus, we can estimate the overall effect from these independent variables, like age and income. And on the state level effect, we can have the overall idea based on the estimated parameter values.
 
-## Extension two: zero inflated model
+ * Extension two: zero inflated model
 
 Zero-inflated model originally provide mixture of a mixtures of a Poisson and Bernoulli probability mass function to allow more flexibility in modeling the probability of a zero outcome. Zero-inflated models, as defined by Lambert (1992), add additional probability mass to the outcome of zero. But, this extension can also be applied for other categorical distributions like binomial distribution we used in this project. 
 
@@ -185,11 +257,15 @@ In stan, we estimate the model in this following ways:
 ```{r eval=FALSE}
 for (j in 1:N_train){
     if (y[j] == 0){
-      target += log_sum_exp(bernoulli_lpmf(1 | theta), bernoulli_lpmf(0 | theta) + binomial_logit_lpmf(y[j] | n_city_train[j],alpha[state_train[j]] + X_train[j,]* beta));
-      }
+      target += log_sum_exp(bernoulli_lpmf(1 | theta), 
+                bernoulli_lpmf(0 | theta) + 
+                binomial_logit_lpmf(y[j] | n_city_train[j],
+                alpha[state_train[j]] + X_train[j,]* beta));}
     else{
-      target += bernoulli_lpmf(0 | theta) + binomial_logit_lpmf(y[j] | n_city_train[j],alpha + X_train[j,] * beta);}
-  }
+      target += bernoulli_lpmf(0 | theta) + 
+                binomial_logit_lpmf(y[j] | n_city_train[j],
+                              alpha + X_train[j,] * beta);}
+}
 ```
 
 And we predict the $y_{rep}$ in the following way:
@@ -204,14 +280,16 @@ generated quantities{
       y_rep[i] = 0;
       }
     else{
-      y_rep[i] = binomial_rng(n_city_train[i],inv_logit(alpha[state_train[i]] + X_train[i,]* beta));
+      y_rep[i] = binomial_rng(n_city_train[i],
+                 inv_logit(alpha[state_train[i]] + 
+                X_train[i,]* beta));
       }
-  }
+}
 }
 ```
 
 
-### Model Coveage testing wit fake data.
+### Fake Data Recoverage
 
 In this part, we first simulate the fake data as we assume in thie model. Then, we will check that our model works well with the data that we have simulated ourselves. In this following are the model coverage plots.
 
@@ -225,54 +303,9 @@ Finally, let's check the parameter recoverage of $\alpha,\theta,\tau$
 
 As we can see, all the parameters in our fake data recover very well. This means it is reliable to use rstan to run this model.
 
-
-### Model Check
-
-##### Posterior Predict Check (PPC) 
-
-In the plot below we have the kernel density estimate of the observed data (y, thicker curve) and 200 simulated data sets ($y_{rep}$, thin curves) from the posterior predictive distribution. If the model fits the data well, as it does here, there is little difference between the observed dataset and the simulated datasets.
-![](./pic/Distributions-of-observed-data-and-a-random-sample-of-replications.png)
-
-As we can see from the polt below, $y_{rep}$ behavior well in the four most common statistics.  Ideally this vertical line would fall somewhere within the histogram, as what we did.
-![](./pic/Distributions-of-test-statistics.png .png)
-
-The plot below shows the observed and average simulated value. As we can see the model fit the data very well without obvious outliers.
-![](./pic/observe-vs-average-simulated-value.png)
-
-The residuals centered at 0 and have small variance. This indecates that the model fit is acceptable.
-![](./pic/residule-distribution.png)
-
-
-
-
-### Cross Validation & MSE
-
-In order to determine our model performance, again we do the 5-floder cross validation. And we calculate the MSE for each training dataset with our model. And then we get the average MSE. The stan code we used to simulate the $y_hat$ is as the following:
-
-```{r eval=FALSE}
-generated quantities{
-  int y_rep_cv[N_test];
-  real<lower =0,upper=1> zero_test[N_test];
-  for (i in 1:N_test){
-    zero_test[i] = uniform_rng(0,1);
-    if (zero_test[i] < theta){
-      y_rep_cv[i] = 0;
-      }
-    else{
-      y_rep_cv[i] = binomial_rng(n_city_test[i],inv_logit( alpha[state_test[i]] + X_test[i,]* beta));
-      }
-  }
-}
-```
-
-
-Acrroding to the result, the baseline MSE is 128164. But for our model, the average MSE is **7583** with the standard deviation **6831**. Thus, we can say that our model have a huge improve from the baseline.
-
-
-
 ### Model result
 
-#### Brief results 
+ 1. Brief results
 In the following is the basic model results:
 ```{r eval=FALSE}
            mean se_mean   sd    2.5%     25%     50%     75%     98% n_eff Rhat
@@ -324,7 +357,7 @@ lp__    -812.85    0.20 4.82 -823.32 -815.77 -812.58 -809.53 -804.33   593  1.0
 A quick check for the Rhat in our model is all very good. The posterior confidence interval of the parameters are show as the following plots.
 
 
-#### Confidence intervial and interpretation
+ 2. Confidence intervial and interpretation
 
 ![](./pic/posterior-distribution-of-betas.png)
 
@@ -339,13 +372,55 @@ The state effects are obvious. We can see that $\phi_3$ (QUERETARO DE ARTEAGA), 
 As we can see, the overall offset effect is obvious that for about -2.67. And on avrage, there will have 1% of cities have no default at all. On 95% confidence interval, there will have less than 3% of cities have no default.
 
 
+### Model Check
 
-# Conclusion
+ 1. General Posterior Predict Check
+
+In the plot below we have the kernel density estimate of the observed data (y, thicker curve) and 200 simulated data sets ($y_{rep}$, thin curves) from the posterior predictive distribution. If the model fits the data well, as it does here, there is little difference between the observed dataset and the simulated datasets.
+![](./pic/Distributions-of-observed-data-and-a-random-sample-of-replications.png)
+
+As we can see from the polt below, $y_{rep}$ behavior well in the four most common statistics.  Ideally this vertical line would fall somewhere within the histogram, as what we did.
+![](./pic/Distributions-of-test-statistics.png .png)
+
+The plot below shows the observed and average simulated value. As we can see the model fit the data very well without obvious outliers.
+![](./pic/observe-vs-average-simulated-value.png)
+
+The residuals centered at 0 and have small variance. This indecates that the model fit is acceptable.
+![](./pic/residule-distribution.png)
 
 
 
 
-# Exercises and Extensions
+ 2. Cross Validation
+
+In order to determine our model performance, again we do the 5-floder cross validation. And we calculate the MSE for each training dataset with our model. And then we get the average MSE. The stan code we used to simulate the $y_hat$ is as the following:
+
+```{r eval=FALSE}
+generated quantities{
+  int y_rep_cv[N_test];
+  real<lower =0,upper=1> zero_test[N_test];
+  for (i in 1:N_test){
+    zero_test[i] = uniform_rng(0,1);
+    if (zero_test[i] < theta){
+      y_rep_cv[i] = 0;
+      }
+    else{
+      y_rep_cv[i] = binomial_rng(n_city_test[i],
+                    inv_logit( alpha[state_test[i]] + 
+                    X_test[i,]* beta));
+      }
+  }
+}
+```
+
+
+Acrroding to the result, the baseline MSE is 128164. But for our model, the average MSE is **7583** with the standard deviation **6831**. Thus, we can say that our model have a huge improve from the baseline.
+
+
+
+
+
+# Discussion
 ## Model discussion: Individual level Analysis
 
 In the past chapters, we focus on the city level analysis. In this way, we simplified our data set and clearified our model design ideas. More importantly, it saves a lot of time to run this model in city level. However, in reality, people may also interested in the individual default risk. Besides, some independent variables like average age is not make so much sense.
@@ -410,31 +485,32 @@ lp__    -7215.11    2.34 13.51 -7251.54    33 1.11
 
 Clearly, the individual level model did not converge as well as the city level model. And it takes much more time. But We can still get lots of useful information from the result:
 
-1. About 69% of the invdividual would not defalut at all. 
+ *  About 69% of the invdividual would not defalut at all. 
 
-2. Compared with the city level model, the independent variables' effects and state effects tends to be more obvious with smaller standard deviation. And the result is consistant. 
+ *  Compared with the city level model, the independent variables' effects and state effects tends to be more obvious with smaller standard deviation. And the result is consistant. 
+
 
 ## Other Discussion
 
 This case study's idea can be easily applied and extended for realistic applications in several obvious ways. Just like we did in the individual level analysis. There are some other thinking about this case study.
 
-1.  *Simulation-based calibration*.  Write a Stan model to simulate data from this model.  First simulate parameters from the prior (or pick ones consistent with the priors).  Then simulate data from the parameters.  Finally, fit the model in Stan and compare the coverage as in the last plot in the case study.
+ *  *Simulation-based calibration*.  Write a Stan model to simulate data from this model.  First simulate parameters from the prior (or pick ones consistent with the priors).  Then simulate data from the parameters.  Finally, fit the model in Stan and compare the coverage as in the last plot in the case study.
 
-2.  *Forecasting and backcasting*.  Extend predictions another 50 years into the future and plot as in the last plot.  This can be done by extending the solution points in the transformed parameters, but is more efficiently done in the generated quantities block.  Next, extend the predictions 50 years into the past and plot.
+ *  *Forecasting and backcasting*.  Extend predictions another 50 years into the future and plot as in the last plot.  This can be done by extending the solution points in the transformed parameters, but is more efficiently done in the generated quantities block.  Next, extend the predictions 50 years into the past and plot.
 
-3.  *Missing data*.  Suppose that several of the measurements are missing.  Write a Stan program that uses only the observed measurements.  This will require coding the data in long form.  Only this part of the model changes; the ODE is set up and fit as before with the complete set of time points. What happens to the computation and posterior inferences as increasing amounts of data are missing? How can the missing data points be imputed using the generated quantities block?38
+ *  *Missing data*.  Suppose that several of the measurements are missing.  Write a Stan program that uses only the observed measurements.  This will require coding the data in long form.  Only this part of the model changes; the ODE is set up and fit as before with the complete set of time points. What happens to the computation and posterior inferences as increasing amounts of data are missing? How can the missing data points be imputed using the generated quantities block?38
 
-4. *Error model*. Replace the lognormal error with a simple normal error model. What does this do to the z estimates and to the basic parameter estimates? Which error model fits better?
+ * *Error model*. Replace the lognormal error with a simple normal error model. What does this do to the z estimates and to the basic parameter estimates? Which error model fits better?
 
-5. *Sensitivity analysis and prior choice*. Perform a sensitivity analysis on the prior choices made for this model. When the prior means or scales are varied, how much does the posterior vary? Does the model become easier or harder to fit (in terms of effective sample size per unit time or divergent transitions) with different prior choices? What does this imply about the number of digits with which we report results and thus the effective sample sizes necessary for most inferences?
+ * *Sensitivity analysis and prior choice*. Perform a sensitivity analysis on the prior choices made for this model. When the prior means or scales are varied, how much does the posterior vary? Does the model become easier or harder to fit (in terms of effective sample size per unit time or divergent transitions) with different prior choices? What does this imply about the number of digits with which we report results and thus the effective sample sizes necessary for most inferences?
 
-6. *Model misspecification*. Swap the coding of the lynx and hare in the input so that the predator is modeled as prey and vice-versa. How well does it fit the data? How does this provide evidence for the folk theorem?
-
-
+ * *Model misspecification*. Swap the coding of the lynx and hare in the input so that the predator is modeled as prey and vice-versa. How well does it fit the data? How does this provide evidence for the folk theorem?
 
 
+# Conclusion
 
-## References {-}
+
+# References {-}
 
 * Besag, Julian, Jeremy York, and Annie Mollié. (1991)  Bayesian image restoration, with two applications in spatial statistics. *Annals of the institute of statistical mathematics*, 43.1: 1-20.
 * Gelfand, Alan E., and Penelope Vounatsou. (2003) Proper multivariate conditional autoregressive models for spatial data analysis. *Biostatistics* 4.1: 11-15.
@@ -447,6 +523,7 @@ the Lotka-Volterra model in Stan](http://mc-stan.org/users/documentation/case-st
 * Andrew Gelman, John B. Carlin, Hal S. Stern, David B. Dunson, Aki Vehtari, Donald B. Rubin (2014) [*Bayesian Data Analysis*](https://www.google.com/search?q=bayesian+data+analysis&oq=bayesian+data+analysis&aqs=chrome.0.69i59j69i60l2j69i61j69i65j0.3253j1j4&sourceid=chrome&ie=UTF-8)
 * Stan Development Team (2018) [*Bayesian Statistics Using Stan*](http://www.stat.columbia.edu/~gelman/bda.course/_book/)
 
+# Statements
 ## Source code {-}
 All of the source code, data, text, and images for this case study are available on GitHub at：
 * [A bayesian approach to indentify morgage default rate at city level](https://github.com/ChrisChen0429/BDA_project)
@@ -456,21 +533,21 @@ The complete Stn program for this case study are  available on the google at:
 * [A bayesian approach to indentify morgage default rate at city level](https://docs.google.com/document/d/1N0XtUlnsnYi_bInkrbTQG2DCD1Hf7mXaSoZWQbWrOqg/edit?usp=sharing)
 
 
-## Acknowledgements {-}
-Thanks to Simon Woodward, Arya Pourzanjani, and Leo Lahti for helpful comments on earlier drafts and Peter Howard for providing the provenance of the data and the original case study with the data.
+# Acknowledgements {-}
+Thanks to [...]
 
 <br />
 
 
 
-## Session information  {-}
+# Session information  {-}
 <div style="font-size:90%">
 ```{r}
 sessionInfo()
 ```
 </div>
 
-## Licenses  {-}
+# Licenses  {-}
 
 <span style="font-size:85%">Code &copy; 2017--2018, Columbia University in New York, licensed under BSD-3.</span>
 
