@@ -383,4 +383,7 @@ individual_data = list(S=32,N=length(y), D=ncol(X),
                    X=X, W = A,W_n = sum(A) / 2,
                    y = y)
 individual = stan('model2_individual.stan', data=individual_data,seed=1234)
-
+saveRDS(individual, file = "individual_fit")
+print(individual, pars = c('alpha','beta','phi','theta','lp__'),probs=0.01)
+ss_mod = as.shinystan(individual)
+launch_shinystan(ss_mod)

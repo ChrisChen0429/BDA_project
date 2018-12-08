@@ -218,7 +218,7 @@ color_scheme_set("brightblue")
 mcmc_recover_hist(sims_fake[, 1:8], true)
 ```
 
-We see that most $\beta$'s didn't recovered well except $beta_{6}$ and $\beta_{7}$.
+We see that most $\beta$'s didn't recovered well except $\beta_{6}$ and $\beta_{7}$.
 
 
 ### Fit real data
