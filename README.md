@@ -1,6 +1,6 @@
-# BDA Project
-Columbia University Fall 2018
-GR 5224 Bayesian Data Analysis Final Project
+# STAT 5224 Bayesian Data Analysis Final Project
+## Columbia University Fall 2018
+
 
 This repository contains R and stan codes for the final BDA project.
 
