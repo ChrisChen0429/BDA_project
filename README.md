@@ -9,7 +9,7 @@ Clone our project repository: `https://github.com/ChrisChen0429/BDA_project`
 
 
 ## Dataset
-Our Dataset is private. Please see the data description in Mexico_Default.pdf.
+Our Dataset is private. Please look in folder `final` for file `Predicting_Default_Mexico.pdf` and for the code in `Predicting_Default_Mexico.rmd`
 
 
 ## Contributors
